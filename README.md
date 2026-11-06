@@ -30,8 +30,6 @@ for long chats. Swap the image whenever you like; the readability stays.
   and the minimum size to aim for.
 - **Ultrawide-ready** — built and tested on a 5120 × 1440 (32:9) monitor.
 - **One click away** — an *App Wallpaper* entry in the sidebar opens the settings.
-- **Wallpaper tools included** — scripts to generate crisp halftone wallpapers at any size and to
-  upscale small images with AI.
 
 ## 📸 Screenshots
 
@@ -71,7 +69,7 @@ Open **App Wallpaper** in the sidebar (or *Settings → Plugins → App Wallpape
 | Setting | What it does |
 | --- | --- |
 | **Show wallpaper** | Turns the plugin on or off. |
-| **Image** | Path to an image on the daemon host, e.g. `~/Pictures/wallpaper.jpg`, then **Apply**. Leave empty for the bundled `assets/default-5120x1440.jpg`. |
+| **Image** | Path to an image on the daemon host, e.g. `~/Pictures/wallpaper.jpg`, then **Apply**. Leave empty for the bundled `assets/default-5120x1440.jpg` (procedural violet halftone clouds). |
 | **Fit** | *Fill window* (crops a little), *Whole image, blurred edges*, or *Whole image, black bars*. |
 | **Sharpness** | Image size vs. window size, with a warning when the image is stretched. |
 | **Left / Right / Bottom gradient** | Strength of each gradient, from none to 100 %. |
@@ -89,7 +87,8 @@ Use an image **at least as large as your window**, in landscape:
 | 4K | 3840 × 2160 |
 | 49" 32:9 (e.g. Samsung Odyssey G9) | 5120 × 1440 |
 
-Smaller images get stretched. To enlarge one cleanly, see `tools/upscale.sh` below.
+Smaller images get stretched. To enlarge one cleanly, an AI upscaler such as
+[Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) does a good job.
 
 ## 🤝 Works well with
 
@@ -113,24 +112,6 @@ is an independent project, not affiliated with Chat Polish.
   composer keep their own background.
 - Settings are stored by Paseo on the daemon host (`defineSettings`) and shared by every connected app.
 
-## 🧰 Tools
-
-Scripts in [`tools/`](tools/README.md) (Python with NumPy and Pillow, run with `uv`):
-
-| Script | Purpose |
-| --- | --- |
-| `generate_wallpaper.py` | Procedural halftone clouds — the default wallpaper comes from it. |
-| `generate_waves.py` | Wavy, fabric-like halftone. |
-| `retrame.py` | Re-draws a small halftone photo as crisp dots at any size. |
-| `retrace_lines.py` | Same for op-art line patterns. |
-| `upscale.sh` | AI upscaling ×4 with [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN), then crop to 5120 × 1440. |
-
-```bash
-uv run --with numpy --with pillow python tools/generate_wallpaper.py \
-  --palette violet --width 5120 --height 1440 --out ~/Pictures/my-wallpaper.png
-```
-
-Real-ESRGAN (`realesrgan-ncnn-vulkan`, BSD-3-Clause) is not included: install it separately.
 
 ## ⚠️ Limitations
 
@@ -146,7 +127,7 @@ Real-ESRGAN (`realesrgan-ncnn-vulkan`, BSD-3-Clause) is not included: install it
 | --- | --- |
 | Nothing changes | Check `paseo plugin ls` shows `running`, then reload the app (⌘R / Ctrl+R). |
 | Black background | The image path is wrong or the file is not readable: see `paseo plugin logs app-wallpaper`. |
-| Blurry image | Look at **Sharpness**: use a larger image or upscale it. |
+| Blurry image | Look at **Sharpness**: use a larger image, or upscale it with an AI upscaler. |
 | Black bars | Switch **Fit** to *Fill window* or *Whole image, blurred edges*. |
 | Text hard to read | Raise **Image veil** to 65–85 %. |
 
