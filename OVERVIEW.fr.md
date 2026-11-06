@@ -4,7 +4,7 @@ App Wallpaper met une image en fond de toute l'application Paseo et ajoute par-d
 
 Les dégradés suivent la vraie mise en page. Le plugin mesure la barre latérale, le panneau de droite et la zone d'écriture, et ajuste les dégradés quand vous les redimensionnez. Les conversations restent dégagées pour laisser voir l'image ; les cartes de messages, la zone d'écriture, les fenêtres et les menus gardent leur propre fond. Les grands panneaux qui ne sont pas une conversation reçoivent le voile des panneaux annexes.
 
-Une bande de verre dépoli peut se placer derrière chaque colonne de messages. Sur les écrans sans conversation, comme les réglages ou les pages de plugins, un mode concentration floute ou assombrit le fond. Une image pour écran vertical, facultative, est utilisée quand la fenêtre est plus haute que large.
+Une bande de verre dépoli peut se placer derrière chaque colonne de messages. Sur les écrans sans conversation, comme les réglages ou les pages de plugins, un mode concentration floute ou assombrit le fond. Une image pour écran vertical, facultative, est utilisée quand la fenêtre est plus haute que large. L'image peut bouger très lentement, être retouchée (luminosité, saturation, flou, point de cadrage) et défiler depuis une galerie à l'intervalle choisi.
 
 Trois modes de cadrage sont proposés : remplir la fenêtre (rogne un peu), image entière avec bords flous, ou image entière avec bandes noires. Un indicateur de netteté compare la taille de l'image à celle de la fenêtre et prévient quand l'image est agrandie.
 
@@ -16,7 +16,7 @@ Le fond s'affiche dans l'application de bureau (testée sur macOS et Windows ; L
 
 ## Données et autorisations
 
-- Une image choisie avec **Parcourir…** est envoyée au daemon et enregistrée dans `$PASEO_HOME/plugin-data/app-wallpaper/wallpaper-<heure>.<ext>` ; seule la dernière est conservée.
+- Une image choisie avec **Parcourir…** est envoyée au daemon et enregistrée dans `$PASEO_HOME/plugin-data/app-wallpaper/wallpaper-<heure>.<ext>` ; seule la dernière est conservée, sauf les images de la galerie, gardées jusqu'à ce que vous les retiriez.
 - Le daemon lit le fichier image au chemin indiqué, seulement s'il a une extension d'image et pèse 20 Mo au plus, puis l'envoie aux applications Paseo connectées à ce daemon. L'image n'est envoyée nulle part ailleurs.
 - Le plugin lit le fichier de configuration de Paseo (`$PASEO_HOME/config.json`) pour trouver son dossier d'installation et l'image fournie.
 - Les réglages sont enregistrés par Paseo sur la machine du daemon et partagés par toutes les applications qui y sont connectées.

@@ -180,18 +180,77 @@ function toObjectUrl(dataUrl: string): string {
   return URL.createObjectURL(new Blob([bytes], { type: mime }));
 }
 
+/** Position de l'image selon le point de cadrage choisi. */
+const FOCAL: Record<string, string> = {
+  center: "center",
+  top: "center top",
+  bottom: "center bottom",
+  left: "left center",
+  right: "right center",
+};
+
+/**
+ * Calques, du fond vers le contenu (tous fixes, sous l'interface de Paseo) :
+ *   html::before  (z -4) fond flouté du mode « bords flous » ;
+ *   html::after   (z -3) l'image, avec ses retouches et son mouvement ;
+ *   body::after   (z -2) les dégradés et le voile ;
+ *   body::before  (z -1) le mode concentration ;
+ *   vitres        (z -1) dans un conteneur à part, seulement quand une conversation est affichée.
+ * L'image a son propre calque : elle peut bouger (transform, accéléré par la carte graphique)
+ * sans redessiner les dégradés.
+ */
 function css(view: BackgroundView, imageUrl: string): string {
   const shades = `
     linear-gradient(to right, rgb(0 0 0 / var(--aw-left)) 0px, rgb(0 0 0 / calc(var(--aw-left) * 0.78)) calc(var(--aw-side) * 0.6), rgb(0 0 0 / calc(var(--aw-left) * 0.6)) var(--aw-side), rgb(0 0 0 / calc(var(--aw-left) * 0.25)) calc(var(--aw-side) + 140px), rgb(0 0 0 / 0) calc(var(--aw-side) + 320px)),
     linear-gradient(to left, rgb(0 0 0 / var(--aw-right, 0)) 0px, rgb(0 0 0 / calc(var(--aw-right, 0) * 0.78)) calc(var(--aw-rside, 0px) * 0.6), rgb(0 0 0 / calc(var(--aw-right, 0) * 0.6)) var(--aw-rside, 0px), rgb(0 0 0 / calc(var(--aw-right, 0) * 0.25)) calc(var(--aw-rside, 0px) + 140px), rgb(0 0 0 / 0) calc(var(--aw-rside, 0px) + 320px)),
     linear-gradient(to top, rgb(0 0 0 / var(--aw-bottom)) 0px, rgb(0 0 0 / calc(var(--aw-bottom) * 0.8)) var(--aw-composer), rgb(0 0 0 / 0) calc(var(--aw-composer) + 220px)),
-    linear-gradient(rgb(0 0 0 / var(--aw-dim)), rgb(0 0 0 / var(--aw-dim))),
-    url("${imageUrl}")`;
-  const common = `
+    linear-gradient(rgb(0 0 0 / var(--aw-dim)), rgb(0 0 0 / var(--aw-dim)))`;
+  const blurEdges = view.fit === "blur";
+  const size = view.fit === "cover" ? "cover" : "contain";
+  const position = FOCAL[view.focal] ?? "center";
+  const filter = `brightness(${view.brightness}) saturate(${view.saturation})${view.imageBlur > 0 ? ` blur(${view.imageBlur}px)` : ""}`;
+  // Mouvement lent : zoom et glissement doux, en aller-retour. Durée selon la vitesse choisie.
+  const duration = view.motion === "medium" ? 40 : 90;
+  const motion = view.motion === "off"
+    ? ""
+    : `animation: aw-drift ${duration}s ease-in-out infinite alternate; will-change: transform;`;
+  // Marge pour que les bords ne se voient jamais pendant le mouvement ou avec le flou.
+  const bleed = view.motion !== "off" || view.imageBlur > 0 ? "-4%" : "0";
+  return `
+html { background: #000 !important; }
 body, #root { background: transparent !important; }
+html::before, html::after, body::after {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+}
+html::before {
+  inset: -60px;
+  z-index: -4;
+  ${blurEdges ? `background: url("${imageUrl}") center / cover no-repeat; filter: blur(40px) brightness(0.55) saturate(1.1);` : "display: none;"}
+}
+html::after {
+  inset: ${bleed};
+  z-index: -3;
+  background: url("${imageUrl}") ${position} / ${size} no-repeat;
+  filter: ${filter};
+  ${motion}
+}
+body::after {
+  inset: 0;
+  z-index: -2;
+  background-image: ${shades};
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+@keyframes aw-drift {
+  0% { transform: scale(1.0) translate(0, 0); }
+  50% { transform: scale(1.05) translate(-1.2%, 0.8%); }
+  100% { transform: scale(1.08) translate(1.2%, -0.8%); }
+}
 [${CLEAR}] { background-color: transparent !important; }
 [${SHADE}] { background-color: rgb(0 0 0 / var(--aw-panel)) !important; }
-/* Mode concentration : écrans sans conversation. Calque fixe sous le contenu, au-dessus de l'image. */
+/* Mode concentration : écrans sans conversation. */
 body::before {
   content: "";
   position: fixed;
@@ -219,43 +278,12 @@ html[${FOCUS}="dim"] body::before { opacity: 1; background: rgb(0 0 0 / 0.55); }
   -webkit-mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent);
   mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent);
 }
-@media (prefers-reduced-motion: reduce) { body::before { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+  html::after { animation: none !important; }
+  body::before { transition: none; }
+}
 `;
-  if (view.fit === "blur") {
-    // Image entière au centre ; les bandes vides sont remplies par la même image, agrandie et floutée.
-    // Deux calques fixes sous le contenu : ::before (flou) puis ::after (image nette + dégradés).
-    return `
-html { background: #000 !important; }
-html::before, html::after { content: ""; position: fixed; pointer-events: none; }
-html::before {
-  inset: -60px;
-  z-index: -2;
-  background: url("${imageUrl}") center / cover no-repeat;
-  filter: blur(40px) brightness(0.55) saturate(1.1);
 }
-html::after {
-  inset: 0;
-  z-index: -1;
-  background-image: ${shades} !important;
-  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, contain !important;
-  background-position: 0 0, 0 0, 0 0, 0 0, center !important;
-  background-repeat: no-repeat !important;
-}
-${common}`;
-  }
-  const fit = view.fit === "contain" ? "contain" : "cover";
-  return `
-html {
-  background-color: #000 !important;
-  background-image: ${shades} !important;
-  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, ${fit} !important;
-  background-position: 0 0, 0 0, 0 0, 0 0, center !important;
-  background-repeat: no-repeat !important;
-  background-attachment: fixed !important;
-}
-${common}`;
-}
-
 
 function opaque(color: string): boolean {
   if (!color || color === "transparent") return false;
@@ -400,6 +428,7 @@ export function createBackground(): BackgroundController {
   if (!isWeb()) return { apply: () => {}, probe: () => "pas de page web (mobile)", stop: () => {} };
   let style: El | undefined;
   let imageKey = "";
+  let styleKey = "";
   let objectUrl = "";
   let shadePanels = true;
   let focusMode: "blur" | "dim" | "off" = "blur";
@@ -469,6 +498,7 @@ export function createBackground(): BackgroundController {
     glassBox = undefined;
     document.documentElement.removeAttribute(FOCUS);
     imageKey = "";
+    styleKey = "";
     imageSize = undefined;
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = "";
@@ -493,7 +523,9 @@ export function createBackground(): BackgroundController {
       focusMode = view.focus;
       glass = view.glass;
       html.style.setProperty("--aw-glass", String(view.glass));
-      const key = view.imageKey + ":" + view.fit + ":" + (view.portrait ? "p" : "l");
+      // Deux clés : l'image elle-même (à décoder) et l'apparence (style à reconstruire).
+      const fileKey = view.imageKey + ":" + (view.portrait ? "p" : "l");
+      const lookKey = [fileKey, view.fit, view.motion, view.focal, view.brightness, view.saturation, view.imageBlur].join(":");
       if (!style) {
         style = document.createElement("style");
         style.setAttribute("id", STYLE_ID);
@@ -503,18 +535,21 @@ export function createBackground(): BackgroundController {
         observer = mo;
         window.addEventListener("resize", schedule);
       }
-      if (key !== imageKey) {
+      if (fileKey !== imageKey) {
         const previous = objectUrl;
         objectUrl = toObjectUrl(view.dataUrl);
-        style.textContent = css(view, objectUrl);
         const probe = new Image();
-        const fit = view.fit;
         probe.onload = () => {
-          imageSize = { width: probe.naturalWidth, height: probe.naturalHeight, fit };
+          imageSize = { width: probe.naturalWidth, height: probe.naturalHeight, fit: view.fit };
         };
         probe.src = objectUrl;
         if (previous) URL.revokeObjectURL(previous);
-        imageKey = key;
+        imageKey = fileKey;
+      }
+      if (imageSize) imageSize = { ...imageSize, fit: view.fit };
+      if (lookKey !== styleKey) {
+        style.textContent = css(view, objectUrl);
+        styleKey = lookKey;
       }
       schedule();
     },

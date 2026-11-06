@@ -27,6 +27,19 @@ export const backgroundSettings = defineSettings({
     rightShade: level.default(0.85),
     /** Dégradé noir en bas, derrière la zone d'écriture. */
     bottomShade: level.default(0.85),
+    /** Mouvement lent de l'image (zoom et glissement doux). */
+    motion: z.enum(["off", "slow", "medium"]).default("off"),
+    /** Retouches appliquées à l'affichage (le fichier n'est pas modifié). */
+    brightness: z.number().min(0.3).max(1.6).default(1),
+    saturation: z.number().min(0).max(2).default(1),
+    imageBlur: z.number().min(0).max(30).default(0),
+    /** Point de cadrage : quelle partie de l'image garder quand elle est rognée. */
+    focal: z.enum(["center", "top", "bottom", "left", "right"]).default("center"),
+    /** Galerie d'images et changement automatique (minutes ; "off" : image fixe). */
+    gallery: z.array(z.string()).max(50).default([]),
+    rotation: z.enum(["off", "5", "15", "60", "1440"]).default("off"),
+    /** Décalage ajouté par le bouton « Image suivante ». */
+    rotationOffset: z.number().int().min(0).default(0),
     /** Image utilisée quand la fenêtre est plus haute que large (téléphone en version web, écran tourné). Vide : la même. */
     portraitImagePath: z.string().default(""),
     /** Écrans sans conversation (réglages, pages de plugins) : fond flouté, assombri, ou inchangé. */
@@ -55,6 +68,14 @@ export const backgroundView = z.object({
   glass: level,
   /** Vrai si l'image envoyée est celle pour écran vertical. */
   portrait: z.boolean(),
+  motion: z.enum(["off", "slow", "medium"]),
+  brightness: z.number(),
+  saturation: z.number(),
+  imageBlur: z.number(),
+  focal: z.enum(["center", "top", "bottom", "left", "right"]),
+  /** Rotation : position dans la galerie et moment du prochain changement (ms, null si fixe). */
+  galleryIndex: z.number().nullable(),
+  nextChangeAt: z.number().nullable(),
 });
 export type BackgroundView = z.infer<typeof backgroundView>;
 
@@ -87,7 +108,7 @@ export const uploadStart = defineRpc({
     name: z.string().min(1).max(255),
     size: z.number().int().positive().max(MAX_IMAGE_BYTES),
     /** Image principale ou image pour écran vertical. */
-    slot: z.enum(["landscape", "portrait"]).default("landscape"),
+    slot: z.enum(["landscape", "portrait", "gallery"]).default("landscape"),
   }),
   output: z.object({ ok: z.boolean() }),
 });
@@ -102,4 +123,11 @@ export const uploadFinish = defineRpc({
   name: "upload.finish",
   input: z.object({}),
   output: z.object({ path: z.string() }),
+});
+
+/** Retire une image de la galerie : supprime le fichier s'il a été envoyé avec Parcourir… */
+export const galleryRemove = defineRpc({
+  name: "gallery.remove",
+  input: z.object({ path: z.string() }),
+  output: z.object({ deleted: z.boolean() }),
 });

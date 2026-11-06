@@ -31,6 +31,10 @@ for long chats. Swap the image whenever you like; the readability stays.
   or a darker tone, and comes back sharp when you return to a chat.
 - **Portrait image** — an optional second image used when the window is taller than wide
   (the web app on a phone, a rotated monitor).
+- **Gentle motion** — an optional, very slow zoom and drift; off when the system asks for less motion.
+- **Gallery and rotation** — keep several images and switch every 5 min, 15 min, hour or day,
+  the same image on every device at the same time; a *Next image* button skips ahead.
+- **Adjustments** — brightness, saturation, blur and focal point, applied on display only.
 - **Three fit modes** — *Fill window*, *Whole image with blurred edges* (no black bars, ever),
   or *Whole image with black bars*.
 - **Sharpness check** — tells you live whether your image is downscaled (sharp) or stretched (blurry),
@@ -93,6 +97,9 @@ Open **App Wallpaper** in the sidebar (or *Settings → Plugins → App Wallpape
 | **Side panels** | Veil on panels next to a chat (terminal, files…). |
 | **Glass behind the chat** | Strength of the blurred band behind each message column, from none to 100 %. |
 | **Outside chats** | Focus mode on screens without a chat: *Blur*, *Dark* or *Unchanged*. |
+| **Motion** | *None*, *Slow* or *Medium* zoom and drift. |
+| **Focal point / Brightness / Saturation / Image blur** | Adjust how the image is shown; the file is never modified. |
+| **Gallery** | Add images (**Browse…** or the main image), choose how often they change, skip with *Next image*. |
 | **Portrait image** | Optional image for windows taller than wide, with its own **Browse…** button. |
 | **Image veil** | Darkens the whole image so chat text stays legible. |
 
@@ -168,7 +175,7 @@ Plugin docs: <https://paseo.sh/docs/plugins>
 
 ## 🗺️ Roadmap
 
-- Video wallpapers (MP4, WebM) and gentle motion.
+- Video wallpapers (MP4, WebM).
 
 ## 🤝 Contributing
 

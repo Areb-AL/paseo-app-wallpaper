@@ -95,10 +95,27 @@ export async function readBackground(settings: Settings, wantPortrait = false): 
     focus: values.focus,
     glass: values.glass,
     portrait: false,
+    motion: values.motion,
+    brightness: values.brightness,
+    saturation: values.saturation,
+    imageBlur: values.imageBlur,
+    focal: values.focal,
+    galleryIndex: null as number | null,
+    nextChangeAt: null as number | null,
   };
   const portrait = wantPortrait && values.portraitImagePath.trim() !== "";
   base.portrait = portrait;
-  const path = resolveImage(portrait ? values.portraitImagePath : values.imagePath);
+  let chosen = portrait ? values.portraitImagePath : values.imagePath;
+  // Rotation : même image au même moment sur tous les appareils (calculée à partir de l'heure).
+  if (!portrait && values.rotation !== "off" && values.gallery.length > 0) {
+    const period = Number(values.rotation) * 60_000;
+    const slot = Math.floor(Date.now() / period);
+    const index = (slot + values.rotationOffset) % values.gallery.length;
+    chosen = values.gallery[index];
+    base.galleryIndex = index;
+    base.nextChangeAt = (slot + 1) * period;
+  }
+  const path = resolveImage(chosen);
   if (!path) return { ...base, dataUrl: null, imageKey: "", error: "aw:plugin_dir_missing|" };
   try {
     const image = await loadImage(path);

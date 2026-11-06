@@ -16,6 +16,7 @@ export default function contribute(client: PluginClientContext) {
     setAppLocale("en");
   }
   let alive = true;
+  let rotationTimer: ReturnType<typeof setTimeout> | undefined;
 
   const refresh = () => {
     client
@@ -23,6 +24,10 @@ export default function contribute(client: PluginClientContext) {
       .then((view) => {
         if (!alive) return;
         setLastError(view.error);
+        // Rotation : on redemande l'image au moment du prochain changement.
+        if (rotationTimer) clearTimeout(rotationTimer);
+        rotationTimer = undefined;
+        if (view.nextChangeAt) rotationTimer = setTimeout(refresh, Math.max(1000, view.nextChangeAt - Date.now() + 500));
         if (view.error) console.warn("[app-wallpaper]", view.error);
         background.apply(view);
       })
@@ -51,6 +56,7 @@ export default function contribute(client: PluginClientContext) {
   return () => {
     alive = false;
     stopOrientation();
+    if (rotationTimer) clearTimeout(rotationTimer);
     if (probeTimer) clearTimeout(probeTimer);
     setRefresher(() => {});
     removeSettings();

@@ -1,7 +1,7 @@
 import type { PluginServerContext } from "@getpaseo/plugin/server";
 import { readBackground } from "./server/background";
-import { addChunk, finishUpload, startUpload } from "./server/upload";
-import { backgroundSettings, getBackground, probeLayout, uploadChunk, uploadFinish, uploadStart } from "./shared/background";
+import { addChunk, finishUpload, removeGalleryFile, startUpload } from "./server/upload";
+import { backgroundSettings, galleryRemove, getBackground, probeLayout, uploadChunk, uploadFinish, uploadStart } from "./shared/background";
 
 export default function contribute(server: PluginServerContext) {
   const settings = server.registerSettings(backgroundSettings);
@@ -9,6 +9,7 @@ export default function contribute(server: PluginServerContext) {
   server.handle(uploadStart, startUpload);
   server.handle(uploadChunk, addChunk);
   server.handle(uploadFinish, finishUpload);
+  server.handle(galleryRemove, removeGalleryFile);
   server.handle(probeLayout, ({ report }) => {
     console.log("[app-wallpaper] probe\n" + report);
     return { ok: true };

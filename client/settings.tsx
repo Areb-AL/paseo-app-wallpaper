@@ -11,7 +11,7 @@ import {
 } from "@getpaseo/plugin/client/ui";
 import { useEffect, useRef, useState } from "react";
 import { Text } from "react-native";
-import { backgroundSettings, LEVELS, MAX_IMAGE_BYTES, UPLOAD_CHUNK_BYTES, uploadChunk, uploadFinish, uploadStart } from "../shared/background";
+import { backgroundSettings, galleryRemove, LEVELS, MAX_IMAGE_BYTES, UPLOAD_CHUNK_BYTES, uploadChunk, uploadFinish, uploadStart } from "../shared/background";
 import { resolveLang, TEXTS, translateError, type LanguageSetting } from "./i18n";
 import { getAppLocale, getLastError, refreshBackground } from "./state";
 import { isWeb, pickImageFile, sharpness, toBase64, type Sharpness } from "./web";
@@ -23,6 +23,14 @@ type Values = {
   portraitImagePath: string;
   focus: "blur" | "dim" | "off";
   glass: number;
+  motion: "off" | "slow" | "medium";
+  brightness: number;
+  saturation: number;
+  imageBlur: number;
+  focal: "center" | "top" | "bottom" | "left" | "right";
+  gallery: string[];
+  rotation: "off" | "5" | "15" | "60" | "1440";
+  rotationOffset: number;
   fit: "cover" | "contain" | "blur";
   dim: number;
   leftShade: number;
@@ -38,6 +46,7 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
   const start = useRpc(uploadStart);
   const sendChunk = useRpc(uploadChunk);
   const finish = useRpc(uploadFinish);
+  const removeFile = useRpc(galleryRemove);
   const [upload, setUpload] = useState<{ text: string; error?: string } | null>(null);
   const [info, setInfo] = useState<Sharpness | undefined>(() => sharpness());
   const [imageError, setImageError] = useState<string | null>(() => getLastError());
@@ -74,6 +83,21 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
     { label: t.focusDim, value: "dim" },
     { label: t.focusOff, value: "off" },
   ];
+  const pick = <T extends string>(entries: Array<[T, string]>) => entries.map(([value, label]) => ({ value, label }));
+  const focalOptions = pick([["center", t.focalCenter], ["top", t.focalTop], ["bottom", t.focalBottom], ["left", t.focalLeft], ["right", t.focalRight]]);
+  const motionOptions = pick([["off", t.motionOff], ["slow", t.motionSlow], ["medium", t.motionMedium]]);
+  const rotationOptions = pick([["off", t.rotationOff], ["5", t.rotation5], ["15", t.rotation15], ["60", t.rotation60], ["1440", t.rotation1440]]);
+  const percent = (values: number[]) => values.map((v) => ({ value: String(v), label: Math.round(v * 100) + " %" }));
+  const brightnessOptions = percent([0.5, 0.7, 0.85, 1, 1.15, 1.3]);
+  const saturationOptions = percent([0, 0.5, 0.8, 1, 1.2, 1.5]);
+  const blurOptions = [0, 2, 4, 8, 16].map((v) => ({ value: String(v), label: v === 0 ? t.none : v + " px" }));
+  const gallery = values.gallery ?? [];
+  const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
+  const removeFromGallery = async (path: string) => {
+    await save({ gallery: gallery.filter((p) => p !== path) });
+    removeFile({ path }).catch(() => {});
+  };
+
   const languageOptions = [
     { label: t.auto, value: "auto" },
     { label: "Français", value: "fr" },
@@ -90,7 +114,7 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
   const sharp = sharpnessText();
 
   // Choisir une image sur l'appareil : elle est envoyée au daemon par morceaux, puis utilisée.
-  const chooseImage = async (slot: "landscape" | "portrait") => {
+  const chooseImage = async (slot: "landscape" | "portrait" | "gallery") => {
     const file = await pickImageFile();
     if (!file) return;
     if (file.size > MAX_IMAGE_BYTES) return setUpload({ text: file.name, error: t.errors.too_large });
@@ -103,7 +127,9 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
         setUpload({ text: t.uploading(file.name, done) });
       }
       const { path } = await finish({});
-      if (slot === "portrait") {
+      if (slot === "gallery") {
+        await save({ gallery: [...(values.gallery ?? []), path] });
+      } else if (slot === "portrait") {
         portraitInput.current?.replaceText(path);
         await save({ portraitImagePath: path });
       } else {
@@ -146,6 +172,31 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
           <SettingsAction label={t.change} actionLabel={t.apply} onPress={() => save({ imagePath: pathInput.current?.getText().trim() ?? "" })} />
           <SettingsSelect label={t.fit} hint={t.fitHint} value={values.fit} options={fitOptions} onValueChange={(fit) => save({ fit: fit as Values["fit"] })} />
           <SettingsRow label={t.sharpness} hint={sharp.text} error={sharp.error} />
+        </SettingsCard>
+      </SettingsSection>
+      <SettingsSection title={t.sectionLook}>
+        <SettingsCard>
+          <SettingsSelect label={t.motion} hint={t.motionHint} value={values.motion ?? "off"} options={motionOptions} onValueChange={(v) => save({ motion: v as Values["motion"] })} />
+          <SettingsSelect label={t.focal} hint={t.focalHint} value={values.focal ?? "center"} options={focalOptions} onValueChange={(v) => save({ focal: v as Values["focal"] })} />
+          <SettingsSelect label={t.brightness} value={String(values.brightness ?? 1)} options={brightnessOptions} onValueChange={(v) => save({ brightness: Number(v) })} />
+          <SettingsSelect label={t.saturation} value={String(values.saturation ?? 1)} options={saturationOptions} onValueChange={(v) => save({ saturation: Number(v) })} />
+          <SettingsSelect label={t.imageBlur} hint={t.imageBlurHint} value={String(values.imageBlur ?? 0)} options={blurOptions} onValueChange={(v) => save({ imageBlur: Number(v) })} />
+        </SettingsCard>
+      </SettingsSection>
+      <SettingsSection title={t.sectionGallery}>
+        <SettingsCard>
+          <SettingsSelect label={t.rotation} hint={t.rotationHint} value={values.rotation ?? "off"} options={rotationOptions} onValueChange={(v) => save({ rotation: v as Values["rotation"] })} />
+          {isWeb() ? <SettingsAction label={t.galleryAdd} hint={t.chooseHint} actionLabel={t.browse} onPress={() => chooseImage("gallery")} /> : null}
+          {values.imagePath && !gallery.includes(values.imagePath) ? (
+            <SettingsAction label={t.galleryAddCurrent} hint={t.galleryAddCurrentHint} actionLabel={t.add} onPress={() => save({ gallery: [...gallery, values.imagePath] })} />
+          ) : null}
+          {gallery.length > 1 ? (
+            <SettingsAction label={t.next} actionLabel={t.nextAction} onPress={() => save({ rotationOffset: (values.rotationOffset ?? 0) + 1 })} />
+          ) : null}
+          {gallery.length === 0 ? <SettingsRow label={t.galleryEmpty} /> : null}
+          {gallery.map((path, i) => (
+            <SettingsAction key={path} label={`${i + 1}. ${fileName(path)}`} hint={path} actionLabel={t.remove} onPress={() => removeFromGallery(path)} />
+          ))}
         </SettingsCard>
       </SettingsSection>
       <SettingsSection title={t.sectionPortrait}>

@@ -4,7 +4,7 @@ App Wallpaper puts an image behind the whole Paseo app and adds adjustable layer
 
 The gradients follow the real layout. The plugin measures the sidebar, the right panel and the composer, and resizes the gradients when you resize them. Chats stay clear so the image shows through; message cards, the composer, dialogs and menus keep their own background. Large panels that are not a chat get the side-panel veil.
 
-A frosted-glass band can sit behind each message column. On screens without a chat, such as settings or plugin pages, a focus mode blurs or darkens the wallpaper. An optional portrait image is used when the window is taller than wide.
+A frosted-glass band can sit behind each message column. On screens without a chat, such as settings or plugin pages, a focus mode blurs or darkens the wallpaper. An optional portrait image is used when the window is taller than wide. The image can move very slowly, be adjusted (brightness, saturation, blur, focal point) and rotate through a gallery at a chosen interval.
 
 Three fit modes are available: fill the window (crops a little), show the whole image with blurred edges, or show the whole image with black bars. A sharpness indicator compares the image size with the window size and warns when the image is stretched.
 
@@ -16,7 +16,7 @@ The wallpaper appears in the desktop app (tested on macOS and Windows; Linux use
 
 ## Data and permissions
 
-- An image picked with **Parcourir…** is sent to the daemon and saved as `$PASEO_HOME/plugin-data/app-wallpaper/wallpaper-<time>.<ext>`; only the latest one is kept.
+- An image picked with **Parcourir…** is sent to the daemon and saved as `$PASEO_HOME/plugin-data/app-wallpaper/wallpaper-<time>.<ext>`; only the latest one is kept, except for gallery images, which stay until you remove them from the gallery.
 - The daemon reads the image file from the path you enter, only if it has an image extension and is 20 MB or less, and sends it to the Paseo apps connected to that daemon. The image is not uploaded anywhere else.
 - The plugin reads Paseo's own configuration file (`$PASEO_HOME/config.json`) to find its installation folder and the bundled image.
 - Settings are stored by Paseo on the daemon host and shared by every app connected to it.
