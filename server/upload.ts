@@ -7,15 +7,15 @@ import { MIME, PLUGIN_ID, paseoHome } from "./background";
  * Reçoit une image choisie dans l'appli et l'enregistre dans le dossier de données du plugin
  * ($PASEO_HOME/plugin-data/app-wallpaper). Un seul envoi à la fois : un nouveau début annule le précédent.
  */
-let pending: { ext: string; size: number; received: number; chunks: Uint8Array[] } | undefined;
+let pending: { ext: string; size: number; received: number; chunks: Uint8Array[]; prefix: string } | undefined;
 
 export const dataDir = () => join(paseoHome(), "plugin-data", PLUGIN_ID);
 
-export function startUpload({ name, size }: { name: string; size: number }) {
+export function startUpload({ name, size, slot }: { name: string; size: number; slot: "landscape" | "portrait" }) {
   const ext = extname(name).toLowerCase();
   if (!MIME[ext]) throw new Error("aw:unsupported_format|" + name);
   if (size > MAX_IMAGE_BYTES) throw new Error("aw:too_large|" + name);
-  pending = { ext: ext === ".jpeg" ? ".jpg" : ext, size, received: 0, chunks: [] };
+  pending = { ext: ext === ".jpeg" ? ".jpg" : ext, size, received: 0, chunks: [], prefix: slot === "portrait" ? "portrait-" : "wallpaper-" };
   return { ok: true };
 }
 
@@ -38,11 +38,11 @@ export async function finishUpload() {
   if (upload.received !== upload.size) throw new Error("aw:upload_incomplete|");
   const dir = dataDir();
   await mkdir(dir, { recursive: true });
-  // On ne garde que la dernière image envoyée.
+  // On ne garde que la dernière image envoyée de chaque sorte (principale, écran vertical).
   for (const entry of await readdir(dir)) {
-    if (entry.startsWith("wallpaper-")) await rm(join(dir, entry), { force: true });
+    if (entry.startsWith(upload.prefix)) await rm(join(dir, entry), { force: true });
   }
-  const path = join(dir, `wallpaper-${Date.now()}${upload.ext}`);
+  const path = join(dir, `${upload.prefix}${Date.now()}${upload.ext}`);
   await writeFile(path, Buffer.concat(upload.chunks));
   return { path };
 }

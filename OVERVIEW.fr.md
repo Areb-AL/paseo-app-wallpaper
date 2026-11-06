@@ -4,6 +4,8 @@ App Wallpaper met une image en fond de toute l'application Paseo et ajoute par-d
 
 Les dégradés suivent la vraie mise en page. Le plugin mesure la barre latérale, le panneau de droite et la zone d'écriture, et ajuste les dégradés quand vous les redimensionnez. Les conversations restent dégagées pour laisser voir l'image ; les cartes de messages, la zone d'écriture, les fenêtres et les menus gardent leur propre fond. Les grands panneaux qui ne sont pas une conversation reçoivent le voile des panneaux annexes.
 
+Une bande de verre dépoli peut se placer derrière chaque colonne de messages. Sur les écrans sans conversation, comme les réglages ou les pages de plugins, un mode concentration floute ou assombrit le fond. Une image pour écran vertical, facultative, est utilisée quand la fenêtre est plus haute que large.
+
 Trois modes de cadrage sont proposés : remplir la fenêtre (rogne un peu), image entière avec bords flous, ou image entière avec bandes noires. Un indicateur de netteté compare la taille de l'image à celle de la fenêtre et prévient quand l'image est agrandie.
 
 ## Mise en place

@@ -2,7 +2,7 @@ import type { PluginClientContext, PluginSidebarItemProps } from "@getpaseo/plug
 import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import { BackgroundSettings } from "./client/settings";
 import { setAppLocale, setLastError, setRefresher } from "./client/state";
-import { createBackground, isWeb } from "./client/web";
+import { createBackground, isPortraitWindow, isWeb, watchOrientation } from "./client/web";
 import { getBackground, probeLayout } from "./shared/background";
 
 // Mise au point : envoie la structure de l'écran dans les logs du plugin (paseo plugin logs app-wallpaper).
@@ -19,7 +19,7 @@ export default function contribute(client: PluginClientContext) {
 
   const refresh = () => {
     client
-      .rpc(getBackground, {})
+      .rpc(getBackground, { portrait: isPortraitWindow() })
       .then((view) => {
         if (!alive) return;
         setLastError(view.error);
@@ -33,6 +33,8 @@ export default function contribute(client: PluginClientContext) {
   };
   setRefresher(refresh);
   if (isWeb()) refresh();
+  // Paysage ↔ portrait : on redemande l'image (celle pour écran vertical si elle est réglée).
+  const stopOrientation = watchOrientation(() => refresh());
 
   let probeTimer: ReturnType<typeof setTimeout> | undefined;
   if (PROBE && isWeb()) {
@@ -48,6 +50,7 @@ export default function contribute(client: PluginClientContext) {
 
   return () => {
     alive = false;
+    stopOrientation();
     if (probeTimer) clearTimeout(probeTimer);
     setRefresher(() => {});
     removeSettings();

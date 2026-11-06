@@ -23,6 +23,7 @@ interface El {
   querySelector(selector: string): El | null;
   getBoundingClientRect(): Rect;
   appendChild(el: El): void;
+  readonly childElementCount: number;
   remove(): void;
   style: { setProperty(name: string, value: string): void; removeProperty(name: string): void };
 }
@@ -31,7 +32,7 @@ declare const document: {
   head: El;
   body: El;
   getElementById(id: string): El | null;
-  createElement(tag: "style"): El;
+  createElement(tag: "style" | "div"): El;
   createElement(tag: "input"): FileInput;
   querySelector(selector: string): El | null;
   querySelectorAll(selector: string): ArrayLike<El>;
@@ -77,6 +78,8 @@ declare const MutationObserver: new (cb: () => void) => {
 };
 
 const STYLE_ID = "app-wallpaper-style";
+const GLASS_ID = "app-wallpaper-glass";
+const FOCUS = "data-aw-focus";
 const CLEAR = "data-aw-clear";
 const SHADE = "data-aw-shade";
 const CHAT = '[data-testid="agent-chat-scroll"]';
@@ -144,6 +147,24 @@ export function pickImageFile(): Promise<{ name: string; size: number; bytes: Ui
   });
 }
 
+/** Vrai quand la fenêtre est plus haute que large. */
+export const isPortraitWindow = () => isWeb() && window.innerHeight > window.innerWidth;
+
+/** Prévient quand la fenêtre passe de paysage à portrait ou l'inverse. Renvoie le nettoyage. */
+export function watchOrientation(onChange: (portrait: boolean) => void): () => void {
+  if (!isWeb()) return () => {};
+  let current = isPortraitWindow();
+  const listener = () => {
+    const next = isPortraitWindow();
+    if (next !== current) {
+      current = next;
+      onChange(next);
+    }
+  };
+  window.addEventListener("resize", listener);
+  return () => window.removeEventListener("resize", listener);
+}
+
 export const isWeb = () => Platform.OS === "web" && typeof document !== "undefined";
 
 /**
@@ -170,6 +191,35 @@ function css(view: BackgroundView, imageUrl: string): string {
 body, #root { background: transparent !important; }
 [${CLEAR}] { background-color: transparent !important; }
 [${SHADE}] { background-color: rgb(0 0 0 / var(--aw-panel)) !important; }
+/* Mode concentration : écrans sans conversation. Calque fixe sous le contenu, au-dessus de l'image. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease-out;
+}
+html[${FOCUS}="blur"] body::before {
+  opacity: 1;
+  background: rgb(0 0 0 / 0.35);
+  backdrop-filter: blur(24px) saturate(0.9);
+  -webkit-backdrop-filter: blur(24px) saturate(0.9);
+}
+html[${FOCUS}="dim"] body::before { opacity: 1; background: rgb(0 0 0 / 0.55); }
+/* Vitre dépolie derrière chaque colonne de messages. */
+#${GLASS_ID} > div {
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  background: rgb(0 0 0 / var(--aw-glass, 0));
+  backdrop-filter: blur(18px) saturate(0.9);
+  -webkit-backdrop-filter: blur(18px) saturate(0.9);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent);
+}
+@media (prefers-reduced-motion: reduce) { body::before { transition: none; } }
 `;
   if (view.fit === "blur") {
     // Image entière au centre ; les bandes vides sont remplies par la même image, agrandie et floutée.
@@ -221,7 +271,7 @@ function opaque(color: string): boolean {
  * - un grand panneau vertical qui ne contient pas de conversation (terminal, fichiers…) et n'est pas
  *   la barre latérale reçoit un voile sombre, une seule fois (pas sur ses enfants).
  */
-function clearLayout(root: El, side: number, shadePanels: boolean, report?: string[]): number {
+function clearLayout(root: El, side: number, shadePanels: boolean, report?: string[]): { rightSide: number; chats: Rect[] } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const shaded = new Set<El>();
@@ -286,7 +336,35 @@ function clearLayout(root: El, side: number, shadePanels: boolean, report?: stri
   // Un panneau qui contient désormais une conversation (ou a disparu) perd son voile.
   const marked = document.querySelectorAll(`[${SHADE}]`);
   for (let i = 0; i < marked.length; i++) if (!shaded.has(marked[i])) marked[i].removeAttribute(SHADE);
-  return rightSide;
+  return { rightSide, chats };
+}
+
+/** Rectangles visibles d'un sélecteur. */
+function visibleAll(selector: string): Rect[] {
+  const out: Rect[] = [];
+  const all = document.querySelectorAll(selector);
+  for (let i = 0; i < all.length; i++) {
+    const r = all[i].getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) out.push(r);
+  }
+  return out;
+}
+
+/**
+ * Colonnes des messages : pour chaque conversation visible, la largeur de sa zone d'écriture
+ * (qui est celle des messages), de son haut jusqu'au bas de la zone d'écriture.
+ */
+function messageColumns(chats: Rect[]): Rect[] {
+  const composers = visibleAll(COMPOSER);
+  return chats.map((c) => {
+    const composer = composers.find((k) => k.left + k.width / 2 > c.left && k.left + k.width / 2 < c.right);
+    const width = composer ? composer.width + 112 : Math.min(c.width, 940);
+    const center = composer ? composer.left + composer.width / 2 : c.left + c.width / 2;
+    const left = Math.max(c.left, center - width / 2);
+    const right = Math.min(c.right, center + width / 2);
+    const bottom = composer ? composer.bottom : c.bottom;
+    return { left, right, top: c.top, bottom, width: right - left, height: bottom - c.top };
+  });
 }
 
 /** Premier élément visible : Paseo garde les écrans des autres onglets montés mais cachés. */
@@ -324,6 +402,9 @@ export function createBackground(): BackgroundController {
   let imageKey = "";
   let objectUrl = "";
   let shadePanels = true;
+  let focusMode: "blur" | "dim" | "off" = "blur";
+  let glass = 0;
+  let glassBox: El | undefined;
   let frame = 0;
   let timer = 0;
   let lastPass = 0;
@@ -336,9 +417,33 @@ export function createBackground(): BackgroundController {
     if (!style) return;
     const side = measure();
     const root = document.getElementById("root") ?? document.body;
-    const rightSide = clearLayout(root, side, shadePanels);
-    document.documentElement.style.setProperty("--aw-rside", rightSide + "px");
+    const { rightSide, chats } = clearLayout(root, side, shadePanels);
+    const html = document.documentElement;
+    html.style.setProperty("--aw-rside", rightSide + "px");
+    // Mode concentration : aucune conversation à l'écran.
+    if (focusMode !== "off" && chats.length === 0) html.setAttribute(FOCUS, focusMode);
+    else html.removeAttribute(FOCUS);
+    placeGlass(glass > 0 ? messageColumns(chats) : []);
   };
+  // Vitres : un bloc fixe par colonne de messages, dans un conteneur hors de <body> (non observé).
+  const placeGlass = (columns: Rect[]) => {
+    if (!glassBox) {
+      if (columns.length === 0) return;
+      glassBox = document.createElement("div");
+      glassBox.setAttribute("id", GLASS_ID);
+      document.documentElement.appendChild(glassBox);
+    }
+    while (glassBox.childElementCount < columns.length) glassBox.appendChild(document.createElement("div"));
+    while (glassBox.childElementCount > columns.length) glassBox.children[glassBox.childElementCount - 1].remove();
+    columns.forEach((col, i) => {
+      const pane = glassBox!.children[i];
+      pane.style.setProperty("left", col.left + "px");
+      pane.style.setProperty("top", col.top + "px");
+      pane.style.setProperty("width", Math.max(0, col.width) + "px");
+      pane.style.setProperty("height", Math.max(0, col.height) + "px");
+    });
+  };
+
   // Pendant qu'un agent écrit, la page change sans arrêt : une analyse toutes les 200 ms suffit.
   const schedule = () => {
     if (frame || timer) return;
@@ -360,6 +465,9 @@ export function createBackground(): BackgroundController {
     timer = 0;
     style?.remove();
     style = undefined;
+    glassBox?.remove();
+    glassBox = undefined;
+    document.documentElement.removeAttribute(FOCUS);
     imageKey = "";
     imageSize = undefined;
     if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -369,7 +477,7 @@ export function createBackground(): BackgroundController {
       for (let i = 0; i < marked.length; i++) marked[i].removeAttribute(attr);
     }
     const html = document.documentElement;
-    for (const name of ["--aw-side", "--aw-composer", "--aw-left", "--aw-right", "--aw-rside", "--aw-bottom", "--aw-dim", "--aw-panel"]) html.style.removeProperty(name);
+    for (const name of ["--aw-side", "--aw-composer", "--aw-left", "--aw-right", "--aw-rside", "--aw-bottom", "--aw-dim", "--aw-panel", "--aw-glass"]) html.style.removeProperty(name);
   };
 
   return {
@@ -382,7 +490,10 @@ export function createBackground(): BackgroundController {
       html.style.setProperty("--aw-dim", String(view.dim));
       html.style.setProperty("--aw-panel", String(view.panelShade));
       shadePanels = view.panelShade > 0;
-      const key = view.imageKey + ":" + view.fit;
+      focusMode = view.focus;
+      glass = view.glass;
+      html.style.setProperty("--aw-glass", String(view.glass));
+      const key = view.imageKey + ":" + view.fit + ":" + (view.portrait ? "p" : "l");
       if (!style) {
         style = document.createElement("style");
         style.setAttribute("id", STYLE_ID);
@@ -410,7 +521,8 @@ export function createBackground(): BackgroundController {
     probe() {
       const report: string[] = [`viewport ${window.innerWidth}x${window.innerHeight} dpr=${window.devicePixelRatio} screen=${window.screen.width}x${window.screen.height}`];
       const root = document.getElementById("root") ?? document.body;
-      clearLayout(root, measure(), shadePanels, report);
+      const layout = clearLayout(root, measure(), shadePanels, report);
+      report.push(`chats ${layout.chats.length} focus=${document.documentElement.getAttribute(FOCUS)} glass=${JSON.stringify(messageColumns(layout.chats))}`);
       const handle = visible(SIDEBAR_HANDLE);
       const composer = visible(COMPOSER);
       const vw = window.innerWidth;

@@ -25,6 +25,12 @@ for long chats. Swap the image whenever you like; the readability stays.
   right panel and composer, and they follow you when you resize them.
 - **Readable everywhere** — a global veil for chat text, and a separate veil for side panels
   (terminal, files, Kanban…). Chats stay clear so the image shows through.
+- **Glass behind the chat** — a blurred, darkened band with soft edges sits behind each message
+  column, so long answers stay easy to read while the wallpaper shows on both sides.
+- **Focus mode** — on screens without a chat (settings, plugin pages), the wallpaper fades to a blur
+  or a darker tone, and comes back sharp when you return to a chat.
+- **Portrait image** — an optional second image used when the window is taller than wide
+  (the web app on a phone, a rotated monitor).
 - **Three fit modes** — *Fill window*, *Whole image with blurred edges* (no black bars, ever),
   or *Whole image with black bars*.
 - **Sharpness check** — tells you live whether your image is downscaled (sharp) or stretched (blurry),
@@ -84,7 +90,10 @@ Open **App Wallpaper** in the sidebar (or *Settings → Plugins → App Wallpape
 | **Fit** | *Fill window* (crops a little), *Whole image, blurred edges*, or *Whole image, black bars*. |
 | **Sharpness** | Image size vs. window size, with a warning when the image is stretched. |
 | **Left / Right / Bottom gradient** | Strength of each gradient, from none to 100 %. |
-| **Side panels** | Veil on non-chat panels (terminal, files…). |
+| **Side panels** | Veil on panels next to a chat (terminal, files…). |
+| **Glass behind the chat** | Strength of the blurred band behind each message column, from none to 100 %. |
+| **Outside chats** | Focus mode on screens without a chat: *Blur*, *Dark* or *Unchanged*. |
+| **Portrait image** | Optional image for windows taller than wide, with its own **Browse…** button. |
 | **Image veil** | Darkens the whole image so chat text stays legible. |
 
 ### Pick an image that stays sharp
@@ -156,9 +165,7 @@ Plugin docs: <https://paseo.sh/docs/plugins>
 
 ## 🗺️ Roadmap
 
-- Focus mode: blur the wallpaper on screens without a chat (settings, plugin pages).
-- Gentle animated wallpapers.
-- Frosted glass behind the chat column.
+- Video wallpapers (MP4, WebM) and gentle motion.
 
 ## 🤝 Contributing
 

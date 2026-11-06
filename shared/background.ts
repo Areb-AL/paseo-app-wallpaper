@@ -27,6 +27,12 @@ export const backgroundSettings = defineSettings({
     rightShade: level.default(0.85),
     /** Dégradé noir en bas, derrière la zone d'écriture. */
     bottomShade: level.default(0.85),
+    /** Image utilisée quand la fenêtre est plus haute que large (téléphone en version web, écran tourné). Vide : la même. */
+    portraitImagePath: z.string().default(""),
+    /** Écrans sans conversation (réglages, pages de plugins) : fond flouté, assombri, ou inchangé. */
+    focus: z.enum(["blur", "dim", "off"]).default("blur"),
+    /** Vitre dépolie derrière la colonne des messages : intensité du voile (0 = pas de vitre). */
+    glass: level.default(0.45),
     /** Voile noir sur les panneaux qui ne sont pas une conversation : terminal, fichiers… */
     panelShade: level.default(0.85),
   }),
@@ -45,12 +51,16 @@ export const backgroundView = z.object({
   rightShade: level,
   bottomShade: level,
   panelShade: level,
+  focus: z.enum(["blur", "dim", "off"]),
+  glass: level,
+  /** Vrai si l'image envoyée est celle pour écran vertical. */
+  portrait: z.boolean(),
 });
 export type BackgroundView = z.infer<typeof backgroundView>;
 
 export const getBackground = defineRpc({
   name: "background.get",
-  input: z.object({}),
+  input: z.object({ portrait: z.boolean().default(false) }),
   output: backgroundView,
 });
 
@@ -73,7 +83,12 @@ export const UPLOAD_CHUNK_BYTES = 3 * 1024 * 1024;
 /** Envoi d'une image choisie dans l'appli : début (nom et taille), morceaux binaires, fin. */
 export const uploadStart = defineRpc({
   name: "upload.start",
-  input: z.object({ name: z.string().min(1).max(255), size: z.number().int().positive().max(MAX_IMAGE_BYTES) }),
+  input: z.object({
+    name: z.string().min(1).max(255),
+    size: z.number().int().positive().max(MAX_IMAGE_BYTES),
+    /** Image principale ou image pour écran vertical. */
+    slot: z.enum(["landscape", "portrait"]).default("landscape"),
+  }),
   output: z.object({ ok: z.boolean() }),
 });
 

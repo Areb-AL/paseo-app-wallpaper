@@ -59,7 +59,8 @@ function resolveImage(setting: string): string | undefined {
   return isAbsolute(raw) ? raw : join(homedir(), raw);
 }
 
-let cache: { key: string; dataUrl: string } | undefined;
+// Deux entrées au plus : l'image principale et celle pour écran vertical.
+const cache = new Map<string, { key: string; dataUrl: string }>();
 
 async function loadImage(path: string): Promise<{ key: string; dataUrl: string }> {
   const mime = MIME[extname(path).toLowerCase()];
@@ -70,13 +71,16 @@ async function loadImage(path: string): Promise<{ key: string; dataUrl: string }
   if (!info.isFile()) throw new Error("aw:not_a_file|" + path);
   if (info.size > MAX_BYTES) throw new Error("aw:too_large|" + path);
   const key = path + ":" + info.mtimeMs + ":" + info.size;
-  if (cache?.key === key) return cache;
+  const hit = cache.get(key);
+  if (hit) return hit;
   const bytes = await readFile(path);
-  cache = { key, dataUrl: "data:" + mime + ";base64," + bytes.toString("base64") };
-  return cache;
+  const entry = { key, dataUrl: "data:" + mime + ";base64," + bytes.toString("base64") };
+  if (cache.size >= 2) cache.delete(cache.keys().next().value as string);
+  cache.set(key, entry);
+  return entry;
 }
 
-export async function readBackground(settings: Settings): Promise<BackgroundView> {
+export async function readBackground(settings: Settings, wantPortrait = false): Promise<BackgroundView> {
   const state = await settings.read();
   if (state.status !== "ready") throw new Error("aw:settings_invalid|");
   const values = state.values;
@@ -88,8 +92,13 @@ export async function readBackground(settings: Settings): Promise<BackgroundView
     rightShade: values.rightShade,
     bottomShade: values.bottomShade,
     panelShade: values.panelShade,
+    focus: values.focus,
+    glass: values.glass,
+    portrait: false,
   };
-  const path = resolveImage(values.imagePath);
+  const portrait = wantPortrait && values.portraitImagePath.trim() !== "";
+  base.portrait = portrait;
+  const path = resolveImage(portrait ? values.portraitImagePath : values.imagePath);
   if (!path) return { ...base, dataUrl: null, imageKey: "", error: "aw:plugin_dir_missing|" };
   try {
     const image = await loadImage(path);

@@ -5,7 +5,7 @@ import { backgroundSettings, getBackground, probeLayout, uploadChunk, uploadFini
 
 export default function contribute(server: PluginServerContext) {
   const settings = server.registerSettings(backgroundSettings);
-  server.handle(getBackground, () => readBackground(settings));
+  server.handle(getBackground, ({ portrait }) => readBackground(settings, portrait));
   server.handle(uploadStart, startUpload);
   server.handle(uploadChunk, addChunk);
   server.handle(uploadFinish, finishUpload);

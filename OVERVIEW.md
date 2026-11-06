@@ -4,6 +4,8 @@ App Wallpaper puts an image behind the whole Paseo app and adds adjustable layer
 
 The gradients follow the real layout. The plugin measures the sidebar, the right panel and the composer, and resizes the gradients when you resize them. Chats stay clear so the image shows through; message cards, the composer, dialogs and menus keep their own background. Large panels that are not a chat get the side-panel veil.
 
+A frosted-glass band can sit behind each message column. On screens without a chat, such as settings or plugin pages, a focus mode blurs or darkens the wallpaper. An optional portrait image is used when the window is taller than wide.
+
 Three fit modes are available: fill the window (crops a little), show the whole image with blurred edges, or show the whole image with black bars. A sharpness indicator compares the image size with the window size and warns when the image is stretched.
 
 ## Setup
