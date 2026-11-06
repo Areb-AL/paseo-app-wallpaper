@@ -1,7 +1,7 @@
 import { defineRpc, defineSettings } from "@getpaseo/plugin";
 import { z } from "zod";
 
-/** Niveaux proposés dans les réglages pour l'assombrissement et les deux dégradés. */
+/** Niveaux proposés dans les réglages pour les voiles et les dégradés. */
 export const LEVELS = [0, 0.25, 0.45, 0.65, 0.85, 1] as const;
 
 /** cover : remplit (rogne) ; contain : image entière (bandes noires) ; blur : image entière, bandes floutées. */
@@ -14,7 +14,7 @@ export const backgroundSettings = defineSettings({
   version: 1,
   schema: z.object({
     enabled: z.boolean().default(true),
-    /** Chemin de l'image sur le Mac (absolu ou avec ~). Vide : l'image fournie avec le plugin. */
+    /** Chemin de l'image sur la machine du daemon (absolu ou avec ~). Vide : l'image fournie avec le plugin. */
     imagePath: z.string().default(""),
     fit: fit.default("cover"),
     /** Voile noir sur toute l'image, pour garder le texte lisible. */
@@ -25,7 +25,7 @@ export const backgroundSettings = defineSettings({
     rightShade: level.default(0.85),
     /** Dégradé noir en bas, derrière la zone d'écriture. */
     bottomShade: level.default(0.85),
-    /** Voile noir (et léger flou) sur les panneaux qui ne sont pas une conversation : terminal, fichiers… */
+    /** Voile noir sur les panneaux qui ne sont pas une conversation : terminal, fichiers… */
     panelShade: level.default(0.85),
   }),
 });

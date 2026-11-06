@@ -12,7 +12,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Text } from "react-native";
 import { backgroundSettings, LEVELS } from "../shared/background";
-import { refreshBackground } from "./state";
+import { getLastError, refreshBackground } from "./state";
 import { sharpness, type Sharpness } from "./web";
 
 function sharpnessText(info: Sharpness | undefined): { text: string; error?: string } {
@@ -37,9 +37,13 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
   const settings = useSettings(backgroundSettings);
   const pathInput = useRef<{ getText(): string } | null>(null);
   const [info, setInfo] = useState<Sharpness | undefined>(() => sharpness());
-  // L'image se charge et la fenêtre change de taille : on relit la netteté chaque seconde.
+  const [imageError, setImageError] = useState<string | null>(() => getLastError());
+  // L'image se charge et la fenêtre change de taille : on relit la netteté et l'erreur chaque seconde.
   useEffect(() => {
-    const timer = setInterval(() => setInfo(sharpness()), 1000);
+    const timer = setInterval(() => {
+      setInfo(sharpness());
+      setImageError(getLastError());
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -67,6 +71,7 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
             initialValue={values.imagePath}
             onChangeText={() => {}}
           />
+          {imageError ? <SettingsRow label="Image introuvable" error={imageError} /> : null}
           <SettingsAction label="Changer l'image" actionLabel="Appliquer" onPress={() => save({ imagePath: pathInput.current?.getText().trim() ?? "" })} />
           <SettingsSelect label="Cadrage" hint="Remplir rogne un peu l'image ; « bords flous » la montre entière sans bandes noires" value={values.fit} options={fitOptions} onValueChange={(fit) => save({ fit: fit as Values["fit"] })} />
           <SettingsRow label="Netteté" hint={sharpnessText(info).text} error={sharpnessText(info).error} />

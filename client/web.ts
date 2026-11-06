@@ -1,6 +1,6 @@
 /**
- * Pose le fond dans l'appli Mac (et la version web) : l'image en fond de page, puis par-dessus, en CSS,
- * un voile, un dégradé noir à gauche (barre latérale) et un dégradé noir en bas (zone d'écriture).
+ * Pose le fond dans l'appli de bureau (et la version web) : l'image en fond de page, puis par-dessus, en CSS,
+ * un voile et trois dégradés noirs : à gauche (barre latérale), à droite (panneau de droite), en bas (zone d'écriture).
  * L'image n'est jamais modifiée. Les grands panneaux opaques de Paseo sont rendus transparents pour la laisser voir.
  *
  * Fragile par nature : Paseo n'a pas d'API pour le fond, ce code s'appuie sur la page de l'appli.
@@ -57,6 +57,8 @@ declare class Image {
 }
 declare function requestAnimationFrame(cb: () => void): number;
 declare function cancelAnimationFrame(id: number): void;
+declare function setTimeout(cb: () => void, ms: number): number;
+declare function clearTimeout(id: number): void;
 declare function getComputedStyle(el: El): { backgroundColor: string; visibility: string; opacity: string };
 declare const MutationObserver: new (cb: () => void) => {
   observe(target: El, options: { childList: boolean; subtree: boolean }): void;
@@ -64,8 +66,8 @@ declare const MutationObserver: new (cb: () => void) => {
 };
 
 const STYLE_ID = "app-wallpaper-style";
-const CLEAR = "data-nerd-clear";
-const SHADE = "data-nerd-shade";
+const CLEAR = "data-aw-clear";
+const SHADE = "data-aw-shade";
 const CHAT = '[data-testid="agent-chat-scroll"]';
 // Pages de réglages : leurs cartes ont déjà un fond, un voile y ferait un rectangle sombre.
 const SETTINGS = '[data-testid="settings-detail-pane"], [data-testid="settings-sidebar"]';
@@ -119,15 +121,15 @@ function toObjectUrl(dataUrl: string): string {
 
 function css(view: BackgroundView, imageUrl: string): string {
   const shades = `
-    linear-gradient(to right, rgb(0 0 0 / var(--nerd-left)) 0px, rgb(0 0 0 / calc(var(--nerd-left) * 0.78)) calc(var(--nerd-side) * 0.6), rgb(0 0 0 / calc(var(--nerd-left) * 0.6)) var(--nerd-side), rgb(0 0 0 / calc(var(--nerd-left) * 0.25)) calc(var(--nerd-side) + 140px), rgb(0 0 0 / 0) calc(var(--nerd-side) + 320px)),
-    linear-gradient(to left, rgb(0 0 0 / var(--nerd-right, 0)) 0px, rgb(0 0 0 / calc(var(--nerd-right, 0) * 0.78)) calc(var(--nerd-rside, 0px) * 0.6), rgb(0 0 0 / calc(var(--nerd-right, 0) * 0.6)) var(--nerd-rside, 0px), rgb(0 0 0 / calc(var(--nerd-right, 0) * 0.25)) calc(var(--nerd-rside, 0px) + 140px), rgb(0 0 0 / 0) calc(var(--nerd-rside, 0px) + 320px)),
-    linear-gradient(to top, rgb(0 0 0 / var(--nerd-bottom)) 0px, rgb(0 0 0 / calc(var(--nerd-bottom) * 0.8)) var(--nerd-composer), rgb(0 0 0 / 0) calc(var(--nerd-composer) + 220px)),
-    linear-gradient(rgb(0 0 0 / var(--nerd-dim)), rgb(0 0 0 / var(--nerd-dim))),
+    linear-gradient(to right, rgb(0 0 0 / var(--aw-left)) 0px, rgb(0 0 0 / calc(var(--aw-left) * 0.78)) calc(var(--aw-side) * 0.6), rgb(0 0 0 / calc(var(--aw-left) * 0.6)) var(--aw-side), rgb(0 0 0 / calc(var(--aw-left) * 0.25)) calc(var(--aw-side) + 140px), rgb(0 0 0 / 0) calc(var(--aw-side) + 320px)),
+    linear-gradient(to left, rgb(0 0 0 / var(--aw-right, 0)) 0px, rgb(0 0 0 / calc(var(--aw-right, 0) * 0.78)) calc(var(--aw-rside, 0px) * 0.6), rgb(0 0 0 / calc(var(--aw-right, 0) * 0.6)) var(--aw-rside, 0px), rgb(0 0 0 / calc(var(--aw-right, 0) * 0.25)) calc(var(--aw-rside, 0px) + 140px), rgb(0 0 0 / 0) calc(var(--aw-rside, 0px) + 320px)),
+    linear-gradient(to top, rgb(0 0 0 / var(--aw-bottom)) 0px, rgb(0 0 0 / calc(var(--aw-bottom) * 0.8)) var(--aw-composer), rgb(0 0 0 / 0) calc(var(--aw-composer) + 220px)),
+    linear-gradient(rgb(0 0 0 / var(--aw-dim)), rgb(0 0 0 / var(--aw-dim))),
     url("${imageUrl}")`;
   const common = `
 body, #root { background: transparent !important; }
 [${CLEAR}] { background-color: transparent !important; }
-[${SHADE}] { background-color: rgb(0 0 0 / var(--nerd-panel)) !important; }
+[${SHADE}] { background-color: rgb(0 0 0 / var(--aw-panel)) !important; }
 `;
   if (view.fit === "blur") {
     // Image entière au centre ; les bandes vides sont remplies par la même image, agrandie et floutée.
@@ -261,8 +263,8 @@ function measure(): number {
   const composer = visible(COMPOSER);
   const bottom = composer && composer.height > 0 ? Math.max(0, Math.round(vh - composer.top + 16)) : 0;
   const html = document.documentElement;
-  html.style.setProperty("--nerd-side", side + "px");
-  html.style.setProperty("--nerd-composer", bottom + "px");
+  html.style.setProperty("--aw-side", side + "px");
+  html.style.setProperty("--aw-composer", bottom + "px");
   return side;
 }
 
@@ -280,18 +282,29 @@ export function createBackground(): BackgroundController {
   let objectUrl = "";
   let shadePanels = true;
   let frame = 0;
+  let timer = 0;
+  let lastPass = 0;
   let observer: { disconnect(): void } | undefined;
 
   const pass = () => {
     frame = 0;
+    timer = 0;
+    lastPass = Date.now();
     if (!style) return;
     const side = measure();
     const root = document.getElementById("root") ?? document.body;
     const rightSide = clearLayout(root, side, shadePanels);
-    document.documentElement.style.setProperty("--nerd-rside", rightSide + "px");
+    document.documentElement.style.setProperty("--aw-rside", rightSide + "px");
   };
+  // Pendant qu'un agent écrit, la page change sans arrêt : une analyse toutes les 200 ms suffit.
   const schedule = () => {
-    if (!frame) frame = requestAnimationFrame(pass);
+    if (frame || timer) return;
+    const wait = 200 - (Date.now() - lastPass);
+    if (wait <= 0) frame = requestAnimationFrame(pass);
+    else timer = setTimeout(() => {
+      timer = 0;
+      frame = requestAnimationFrame(pass);
+    }, wait);
   };
 
   const teardown = () => {
@@ -299,7 +312,9 @@ export function createBackground(): BackgroundController {
     observer = undefined;
     window.removeEventListener("resize", schedule);
     if (frame) cancelAnimationFrame(frame);
+    if (timer) clearTimeout(timer);
     frame = 0;
+    timer = 0;
     style?.remove();
     style = undefined;
     imageKey = "";
@@ -311,18 +326,18 @@ export function createBackground(): BackgroundController {
       for (let i = 0; i < marked.length; i++) marked[i].removeAttribute(attr);
     }
     const html = document.documentElement;
-    for (const name of ["--nerd-side", "--nerd-composer", "--nerd-left", "--nerd-right", "--nerd-rside", "--nerd-bottom", "--nerd-dim", "--nerd-panel"]) html.style.removeProperty(name);
+    for (const name of ["--aw-side", "--aw-composer", "--aw-left", "--aw-right", "--aw-rside", "--aw-bottom", "--aw-dim", "--aw-panel"]) html.style.removeProperty(name);
   };
 
   return {
     apply(view) {
       if (!view.enabled || !view.dataUrl) return teardown();
       const html = document.documentElement;
-      html.style.setProperty("--nerd-left", String(view.leftShade));
-      html.style.setProperty("--nerd-bottom", String(view.bottomShade));
-      html.style.setProperty("--nerd-right", String(view.rightShade));
-      html.style.setProperty("--nerd-dim", String(view.dim));
-      html.style.setProperty("--nerd-panel", String(view.panelShade));
+      html.style.setProperty("--aw-left", String(view.leftShade));
+      html.style.setProperty("--aw-bottom", String(view.bottomShade));
+      html.style.setProperty("--aw-right", String(view.rightShade));
+      html.style.setProperty("--aw-dim", String(view.dim));
+      html.style.setProperty("--aw-panel", String(view.panelShade));
       shadePanels = view.panelShade > 0;
       const key = view.imageKey + ":" + view.fit;
       if (!style) {

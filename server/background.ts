@@ -22,14 +22,27 @@ const paseoHome = () => process.env.PASEO_HOME || join(homedir(), ".paseo");
 
 /**
  * Dossier du plugin. Paseo évalue le bundle serveur depuis une chaîne (import.meta.url est vide) :
- * on lit donc le chemin que Paseo a noté pour ce plugin dans $PASEO_HOME/config.json.
+ * on cherche dans $PASEO_HOME/config.json l'installation dont le manifeste porte notre id. Ainsi,
+ * l'image par défaut est trouvée même si le plugin a été installé sous un autre id (--id).
  */
 function pluginDir(): string | undefined {
   try {
     const config = JSON.parse(readFileSync(join(paseoHome(), "config.json"), "utf8")) as {
       plugins?: Record<string, { path?: string }>;
     };
-    return config.plugins?.[PLUGIN_ID]?.path;
+    const entries = Object.entries(config.plugins ?? {});
+    const direct = config.plugins?.[PLUGIN_ID]?.path;
+    if (direct) return direct;
+    for (const [, entry] of entries) {
+      if (!entry.path) continue;
+      try {
+        const manifest = JSON.parse(readFileSync(join(entry.path, "paseo-plugin.json"), "utf8")) as { id?: string };
+        if (manifest.id === PLUGIN_ID) return entry.path;
+      } catch {
+        // Installation sans manifeste lisible : on passe à la suivante.
+      }
+    }
+    return undefined;
   } catch {
     return undefined;
   }

@@ -1,7 +1,7 @@
 import type { PluginClientContext, PluginSidebarItemProps } from "@getpaseo/plugin/client";
 import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import { BackgroundSettings } from "./client/settings";
-import { setRefresher } from "./client/state";
+import { setLastError, setRefresher } from "./client/state";
 import { createBackground, isWeb } from "./client/web";
 import { getBackground, probeLayout } from "./shared/background";
 
@@ -17,10 +17,14 @@ export default function contribute(client: PluginClientContext) {
       .rpc(getBackground, {})
       .then((view) => {
         if (!alive) return;
+        setLastError(view.error);
         if (view.error) console.warn("[app-wallpaper]", view.error);
         background.apply(view);
       })
-      .catch((error: unknown) => console.warn("[app-wallpaper] fond indisponible", error));
+      .catch((error: unknown) => {
+        setLastError(error instanceof Error ? error.message : String(error));
+        console.warn("[app-wallpaper] fond indisponible", error);
+      });
   };
   setRefresher(refresh);
   if (isWeb()) refresh();

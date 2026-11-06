@@ -87,8 +87,7 @@ Use an image **at least as large as your window**, in landscape:
 | 4K | 3840 × 2160 |
 | 49" 32:9 (e.g. Samsung Odyssey G9) | 5120 × 1440 |
 
-Smaller images get stretched. To enlarge one cleanly, an AI upscaler such as
-[Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) does a good job.
+Smaller images get stretched and look blurry.
 
 ## 🤝 Works well with
 
@@ -119,6 +118,7 @@ is an independent project, not affiliated with Chat Polish.
   (`left-sidebar-resize-handle`, `message-input-root`, `agent-chat-scroll`…), which are not a public
   API: a Paseo update can break it.
 - No effect on the iOS and Android apps.
+- The settings screen is in French for now.
 - The image path is read on the machine running the Paseo daemon, not on the device you are using.
 
 ## 🩺 Troubleshooting
@@ -126,8 +126,8 @@ is an independent project, not affiliated with Chat Polish.
 | Problem | Fix |
 | --- | --- |
 | Nothing changes | Check `paseo plugin ls` shows `running`, then reload the app (⌘R / Ctrl+R). |
-| Black background | The image path is wrong or the file is not readable: see `paseo plugin logs app-wallpaper`. |
-| Blurry image | Look at **Sharpness**: use a larger image, or upscale it with an AI upscaler. |
+| Wallpaper missing | The settings show *Image introuvable* (image not found) with the reason; `paseo plugin logs app-wallpaper` has details. |
+| Blurry image | Look at **Sharpness** and use a larger image. |
 | Black bars | Switch **Fit** to *Fill window* or *Whole image, blurred edges*. |
 | Text hard to read | Raise **Image veil** to 65–85 %. |
 
