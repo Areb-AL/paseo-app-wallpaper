@@ -6,6 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-8b5cf6.svg)](LICENSE)
 [![Paseo](https://img.shields.io/badge/Paseo-%E2%89%A5%200.15.2-1b1a26.svg)](https://paseo.sh)
+[![Paseo catalog](https://img.shields.io/badge/Paseo%20catalog-areb--al%2Fapp--wallpaper-8b5cf6.svg)](https://paseo.sh/plugins/areb-al/app-wallpaper)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20web-5d6f99.svg)](#requirements)
 
 ![App Wallpaper in Paseo](screenshots/1-accueil.jpg)
@@ -47,13 +48,21 @@ for long chats. Swap the image whenever you like; the readability stays.
 
 ### Install
 
+From the [Paseo plugin catalog](https://paseo.sh/plugins/areb-al/app-wallpaper) (reviewed version):
+
 ```bash
-paseo plugin add git:Areb-AL/paseo-app-wallpaper
-paseo plugin ls            # app-wallpaper should be "running"
+paseo plugin add areb-al/app-wallpaper
 ```
 
-You can also paste `git:Areb-AL/paseo-app-wallpaper` into *Settings → Plugins → Plugin source*.
-While the repository is private, the machine running the Paseo daemon needs Git access to it.
+Or find **App Wallpaper** in the plugin catalog inside the app.
+
+Straight from GitHub (latest commit, not yet reviewed):
+
+```bash
+paseo plugin add git:Areb-AL/paseo-app-wallpaper
+```
+
+Check that it runs with `paseo plugin ls`: `app-wallpaper` should be `running`.
 
 ### Update and uninstall
 
