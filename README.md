@@ -1,83 +1,166 @@
-# App Wallpaper
+<div align="center">
+
+# 🖼️ App Wallpaper
+
+**Give Paseo a real wallpaper — and keep every button, message and panel readable.**
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-8b5cf6.svg)](LICENSE)
+[![Paseo](https://img.shields.io/badge/Paseo-%E2%89%A5%200.15.2-1b1a26.svg)](https://paseo.sh)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20web-5d6f99.svg)](#requirements)
 
 ![App Wallpaper in Paseo](screenshots/1-accueil.jpg)
 
+</div>
+
+App Wallpaper is a [Paseo](https://paseo.sh) plugin that puts any image — photo, artwork, animated GIF —
+behind the whole app. Instead of baking shadows into your picture, it lays smart, adjustable layers on
+top: gradients that follow the real size of the sidebar, the composer and the side panels, plus a veil
+for long chats. Swap the image whenever you like; the readability stays.
+
+## ✨ Features
+
+- **Any image, untouched** — JPG, PNG, WebP or animated GIF, up to 20 MB. The file is never edited.
+- **Layout-aware gradients** — left, right and bottom gradients sized to the *actual* sidebar,
+  right panel and composer, and they follow you when you resize them.
+- **Readable everywhere** — a global veil for chat text, and a separate veil for side panels
+  (terminal, files, Kanban…). Chats stay clear so the image shows through.
+- **Three fit modes** — *Fill window*, *Whole image with blurred edges* (no black bars, ever),
+  or *Whole image with black bars*.
+- **Sharpness check** — tells you live whether your image is downscaled (sharp) or stretched (blurry),
+  and the minimum size to aim for.
+- **Ultrawide-ready** — built and tested on a 5120 × 1440 (32:9) monitor.
+- **One click away** — an *App Wallpaper* entry in the sidebar opens the settings.
+- **Wallpaper tools included** — scripts to generate crisp halftone wallpapers at any size and to
+  upscale small images with AI.
+
+## 📸 Screenshots
+
 | Chats, Kanban and side panels | Settings |
 | --- | --- |
-| ![Chats](screenshots/2-conversations.jpg) | ![Settings](screenshots/3-reglages.jpg) |
+| ![Chats, Kanban and side panels](screenshots/2-conversations.jpg) | ![Settings](screenshots/3-reglages.jpg) |
 
-A [Paseo](https://paseo.sh) plugin that puts an image behind the whole app, then adds a few
-adjustable layers on top so everything stays readable. The image itself is never modified:
+## 🚀 Getting started
 
-- a **left gradient**, sized to the real width of the sidebar, behind its buttons;
-- a **right gradient**, sized to the panel docked on the right (files…);
-- a **bottom gradient**, sized to the real height of the composer;
-- a **veil** over the whole image, for the chat text;
-- a **veil on side panels** (terminal, files… any large panel that is not a chat).
+### Requirements
 
-Chats stay clear so the image shows through. Message cards and the composer keep their own background.
+- **Paseo 0.15.2 or later**, with plugins enabled: *Settings → Plugins → Enable plugins*.
+- The **desktop app** (macOS; Windows and Linux use the same app but are untested) or the **web app**.
+- The iOS and Android apps are native and have no page to restyle: the plugin does nothing there.
 
-## Requirements
-
-- Paseo 0.15.2 or later, with plugins enabled (Settings → Plugins).
-- Works in the **desktop app** (macOS; Windows and Linux use the same app, untested) and the
-  **web app**. The iOS and Android apps are native and have no page to restyle: the plugin does nothing there.
-
-## Install
+### Install
 
 ```bash
 paseo plugin add git:Areb-AL/paseo-app-wallpaper
+paseo plugin ls            # app-wallpaper should be "running"
 ```
 
-For a private repository, the machine running the Paseo daemon needs Git access to it.
+You can also paste `git:Areb-AL/paseo-app-wallpaper` into *Settings → Plugins → Plugin source*.
+While the repository is private, the machine running the Paseo daemon needs Git access to it.
 
-## Settings
+### Update and uninstall
 
-Open **App Wallpaper** in the sidebar, or Settings → Plugins → App Wallpaper.
+```bash
+paseo plugin update app-wallpaper
+paseo plugin remove app-wallpaper   # also deletes its settings
+```
+
+## 🎛️ Usage
+
+Open **App Wallpaper** in the sidebar (or *Settings → Plugins → App Wallpaper*).
 
 | Setting | What it does |
 | --- | --- |
-| Show wallpaper | Turns the plugin on or off. |
-| Image | Path to an image on the daemon host (`~/Pictures/wallpaper.jpg`): jpg, png, gif (animated) or webp, up to 20 MB. Empty: `assets/default-5120x1440.jpg`. |
-| Fit | **Fill window** (crops a little), **whole image, blurred edges** (no black bars), or **whole image, black bars**. |
-| Sharpness | Shows the image and window sizes, and warns when the image is stretched (blurry). |
-| Left / right / bottom gradient | Strength of each gradient, from none to 100 %. |
-| Side panels | Veil on non-chat panels (terminal, files…). |
-| Image veil | Darkens the whole image for the chat text. |
+| **Show wallpaper** | Turns the plugin on or off. |
+| **Image** | Path to an image on the daemon host, e.g. `~/Pictures/wallpaper.jpg`, then **Apply**. Leave empty for the bundled `assets/default-5120x1440.jpg`. |
+| **Fit** | *Fill window* (crops a little), *Whole image, blurred edges*, or *Whole image, black bars*. |
+| **Sharpness** | Image size vs. window size, with a warning when the image is stretched. |
+| **Left / Right / Bottom gradient** | Strength of each gradient, from none to 100 %. |
+| **Side panels** | Veil on non-chat panels (terminal, files…). |
+| **Image veil** | Darkens the whole image so chat text stays legible. |
 
-**Tip:** for a sharp result, use an image at least as large as your window, in landscape.
-For a 49" 32:9 monitor such as the Samsung Odyssey G9, that is **5120 × 1440**.
+### Pick an image that stays sharp
 
-## How it works
+Use an image **at least as large as your window**, in landscape:
 
-- `server/background.ts` reads the settings, loads the image and sends it to the app.
-- `client/web.ts` adds a `<style>` tag: the image and the gradients become the `<html>` background.
-  Large images are turned into a Blob URL, because Chromium rejects data URLs over 2 MB.
-  A `MutationObserver` finds large layout blocks with an opaque background and makes them
-  transparent; dialogs, menus, message cards and the composer keep theirs.
-- The plugin relies on Paseo's `data-testid` markers (`left-sidebar-resize-handle`,
-  `message-input-root`, `agent-chat-scroll`…). They are not a public API: a Paseo update can break it.
+| Screen | Aim for |
+| --- | --- |
+| 1080p | 1920 × 1080 |
+| 1440p / MacBook | 2560 × 1440 or more |
+| 4K | 3840 × 2160 |
+| 49" 32:9 (e.g. Samsung Odyssey G9) | 5120 × 1440 |
 
-## Tools
+Smaller images get stretched. To enlarge one cleanly, see `tools/upscale.sh` below.
 
-`tools/` holds the scripts used to make wallpapers (Python with NumPy and Pillow, run with `uv`):
+## ⚙️ How it works
 
-- `generate_wallpaper.py` — procedural halftone clouds (the default image comes from it);
-- `generate_waves.py`, `retrame.py`, `retrace_lines.py` — wavy halftone and line patterns,
-  re-drawn sharp at any size;
-- `upscale.sh` — AI upscaling with [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN)
-  (`realesrgan-ncnn-vulkan`, BSD-3-Clause, not included: install it separately).
+- `server/background.ts` reads the settings, loads the image from disk and sends it to the app.
+- `client/web.ts` adds a `<style>` tag: the image and the gradients become the page background.
+  Images are passed as a Blob URL, because Chromium rejects data URLs over 2 MB.
+- A `MutationObserver` finds large layout blocks with an opaque background and makes them transparent.
+  Large panels that are not a chat get the side-panel veil. Dialogs, menus, message cards and the
+  composer keep their own background.
+- Settings are stored by Paseo on the daemon host (`defineSettings`) and shared by every connected app.
 
-## Development
+## 🧰 Tools
+
+Scripts in [`tools/`](tools/README.md) (Python with NumPy and Pillow, run with `uv`):
+
+| Script | Purpose |
+| --- | --- |
+| `generate_wallpaper.py` | Procedural halftone clouds — the default wallpaper comes from it. |
+| `generate_waves.py` | Wavy, fabric-like halftone. |
+| `retrame.py` | Re-draws a small halftone photo as crisp dots at any size. |
+| `retrace_lines.py` | Same for op-art line patterns. |
+| `upscale.sh` | AI upscaling ×4 with [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN), then crop to 5120 × 1440. |
 
 ```bash
-npm install          # types only
+uv run --with numpy --with pillow python tools/generate_wallpaper.py \
+  --palette violet --width 5120 --height 1440 --out ~/Pictures/my-wallpaper.png
+```
+
+Real-ESRGAN (`realesrgan-ncnn-vulkan`, BSD-3-Clause) is not included: install it separately.
+
+## ⚠️ Limitations
+
+- Paseo has no official wallpaper API. The plugin relies on Paseo's `data-testid` markers
+  (`left-sidebar-resize-handle`, `message-input-root`, `agent-chat-scroll`…), which are not a public
+  API: a Paseo update can break it.
+- No effect on the iOS and Android apps.
+- The image path is read on the machine running the Paseo daemon, not on the device you are using.
+
+## 🩺 Troubleshooting
+
+| Problem | Fix |
+| --- | --- |
+| Nothing changes | Check `paseo plugin ls` shows `running`, then reload the app (⌘R / Ctrl+R). |
+| Black background | The image path is wrong or the file is not readable: see `paseo plugin logs app-wallpaper`. |
+| Blurry image | Look at **Sharpness**: use a larger image or upscale it. |
+| Black bars | Switch **Fit** to *Fill window* or *Whole image, blurred edges*. |
+| Text hard to read | Raise **Image veil** to 65–85 %. |
+
+## 🛠️ Development
+
+```bash
+npm install                     # type definitions only
 npm run typecheck
 paseo plugin install "$PWD"
 paseo plugin reload app-wallpaper
 paseo plugin logs app-wallpaper
 ```
 
-## License
+Plugin docs: <https://paseo.sh/docs/plugins>
 
-[MIT](LICENSE)
+## 🗺️ Roadmap
+
+- Focus mode: blur the wallpaper on screens without a chat (settings, plugin pages).
+- Gentle animated wallpapers.
+- Frosted glass behind the chat column.
+
+## 🤝 Contributing
+
+Issues and pull requests are welcome. Please describe your Paseo version and platform, and attach a
+screenshot when something looks wrong.
+
+## 📄 License
+
+[MIT](LICENSE) © Areb ([@Areb-AL](https://github.com/Areb-AL))
