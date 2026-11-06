@@ -10,7 +10,7 @@ Trois modes de cadrage sont proposés : remplir la fenêtre (rogne un peu), imag
 
 Nécessite Paseo 0.15.2 ou plus récent. Ouvrez App Wallpaper depuis la barre latérale ou depuis les réglages du plugin, puis indiquez le chemin d'une image sur la machine où tourne le daemon Paseo (par exemple `~/Pictures/fond.jpg`). Les formats JPG, PNG, WebP et GIF animé sont acceptés, jusqu'à 20 Mo. Sans chemin, une image fournie en 5120 × 1440 est utilisée. Pour un rendu net, choisissez une image au moins aussi grande que votre fenêtre, en paysage.
 
-Le fond s'affiche dans l'application de bureau (testée sur macOS ; Windows et Linux utilisent la même application mais n'ont pas été testés) et dans l'application web. Les applications iOS et Android sont natives et n'ont pas de page à modifier : le plugin n'y a aucun effet. L'écran de réglages est en français.
+Le fond s'affiche dans l'application de bureau (testée sur macOS et Windows ; Linux utilise la même application mais n'a pas été testé) et dans l'application web. Les applications iOS et Android sont natives et n'ont pas de page à modifier : le plugin n'y a aucun effet. L'écran de réglages est en français.
 
 ## Données et autorisations
 

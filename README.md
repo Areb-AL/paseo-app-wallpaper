@@ -42,7 +42,7 @@ for long chats. Swap the image whenever you like; the readability stays.
 ### Requirements
 
 - **Paseo 0.15.2 or later**, with plugins enabled: *Settings → Plugins → Enable plugins*.
-- The **desktop app** (macOS; Windows and Linux use the same app but are untested) or the **web app**.
+- The **desktop app** (tested on macOS and Windows; Linux uses the same app but is untested) or the **web app**.
 - The iOS and Android apps are native and have no page to restyle: the plugin does nothing there.
 
 ### Install

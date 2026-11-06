@@ -10,7 +10,7 @@ Three fit modes are available: fill the window (crops a little), show the whole 
 
 Requires Paseo 0.15.2 or later. Open App Wallpaper from the sidebar, or from the plugin's settings, then enter the path of an image on the machine running the Paseo daemon (for example `~/Pictures/wallpaper.jpg`). JPG, PNG, WebP and animated GIF are supported, up to 20 MB. With no path, a bundled 5120 × 1440 image is used. For a sharp result, use an image at least as large as your window, in landscape.
 
-The wallpaper appears in the desktop app (tested on macOS; Windows and Linux use the same app but are untested) and in the web app. The iOS and Android apps are native and have no page to restyle, so the plugin has no effect there. The settings screen is in French for now.
+The wallpaper appears in the desktop app (tested on macOS and Windows; Linux uses the same app but is untested) and in the web app. The iOS and Android apps are native and have no page to restyle, so the plugin has no effect there. The settings screen is in French for now.
 
 ## Data and permissions
 
