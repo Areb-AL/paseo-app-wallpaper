@@ -12,3 +12,10 @@ export const setLastError = (message: string | null) => {
   lastError = message;
 };
 export const getLastError = () => lastError;
+
+/** Langue de l'appli Paseo, lue au démarrage du plugin (« en » si inconnue). */
+let appLocale = "en";
+export const setAppLocale = (locale: string) => {
+  appLocale = locale || "en";
+};
+export const getAppLocale = () => appLocale;

@@ -32,6 +32,7 @@ declare const document: {
   body: El;
   getElementById(id: string): El | null;
   createElement(tag: "style"): El;
+  createElement(tag: "input"): FileInput;
   querySelector(selector: string): El | null;
   querySelectorAll(selector: string): ArrayLike<El>;
   elementsFromPoint(x: number, y: number): El[];
@@ -44,7 +45,17 @@ declare const window: {
   addEventListener(type: "resize", listener: () => void): void;
   removeEventListener(type: "resize", listener: () => void): void;
 };
+interface FileLike { name: string; size: number; arrayBuffer(): Promise<ArrayBuffer> }
+interface FileInput {
+  type: string;
+  accept: string;
+  files: ArrayLike<FileLike> | null;
+  onchange: (() => void) | null;
+  addEventListener(type: "cancel", listener: () => void): void;
+  click(): void;
+}
 declare function atob(data: string): string;
+declare function btoa(data: string): string;
 declare class Blob {
   constructor(parts: Uint8Array[], options: { type: string });
 }
@@ -102,6 +113,35 @@ export function sharpness(): Sharpness | undefined {
     pixelRatio: dpr,
     scale: imageSize.fit === "cover" ? Math.max(sx, sy) : Math.min(sx, sy),
   };
+}
+
+/** Encode des octets en base64, par tranches pour ne pas dépasser la taille d'appel de fonction. */
+export function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 0x8000)));
+  }
+  return btoa(binary);
+}
+
+/** Ouvre le sélecteur de fichiers de l'appareil et renvoie l'image choisie (null si annulé). */
+export function pickImageFile(): Promise<{ name: string; size: number; bytes: Uint8Array } | null> {
+  if (!isWeb()) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/jpeg,image/png,image/gif,image/webp";
+    input.addEventListener("cancel", () => resolve(null));
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return resolve(null);
+      file
+        .arrayBuffer()
+        .then((buffer) => resolve({ name: file.name, size: file.size, bytes: new Uint8Array(buffer) }))
+        .catch(() => resolve(null));
+    };
+    input.click();
+  });
 }
 
 export const isWeb = () => Platform.OS === "web" && typeof document !== "undefined";

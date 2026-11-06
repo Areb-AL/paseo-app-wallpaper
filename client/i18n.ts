@@ -1,0 +1,133 @@
+/** Textes de l'écran de réglages, en français et en anglais. */
+export type Lang = "fr" | "en";
+export type LanguageSetting = "auto" | Lang;
+
+const fr = {
+  language: "Langue",
+  languageHint: "Auto suit la langue de Paseo",
+  auto: "Auto",
+  loading: "Chargement…",
+  settingsInvalid: "Réglages illisibles : ",
+  sectionWallpaper: "Fond d'écran",
+  show: "Afficher le fond",
+  showHint: "Appli de bureau et version web uniquement",
+  choose: "Choisir une image",
+  chooseHint: "Sur cet appareil ; elle est copiée sur la machine de Paseo",
+  browse: "Parcourir…",
+  upload: "Envoi",
+  uploading: (name: string, pct: number) => `Envoi de ${name}… ${pct} %`,
+  uploaded: (name: string) => `${name} est en place.`,
+  image: "Image",
+  imageHint: "Ou un chemin sur la machine de Paseo (jpg, png, gif ou webp). Vide : l'image fournie avec le plugin.",
+  imageError: "Image introuvable",
+  change: "Changer l'image",
+  apply: "Appliquer",
+  fit: "Cadrage",
+  fitHint: "Remplir rogne un peu l'image ; « bords flous » la montre entière sans bandes noires",
+  fitCover: "Remplir la fenêtre",
+  fitBlur: "Image entière, bords flous",
+  fitContain: "Image entière, bandes noires",
+  sharpness: "Netteté",
+  sharpnessNone: "Disponible sur l'appli de bureau une fois l'image affichée.",
+  sizes: (iw: number, ih: number, ww: number, wh: number) => `Image ${iw} × ${ih} · fenêtre ${ww} × ${wh}`,
+  sharp: " : nette (réduite ou à taille réelle).",
+  blurry: (factor: string, need: string) => `Agrandie ×${factor} : elle sera floue. Prends une image d'au moins ${need}.`,
+  sectionReadability: "Lisibilité",
+  left: "Dégradé à gauche",
+  leftHint: "Derrière la barre latérale et ses boutons",
+  right: "Dégradé à droite",
+  rightHint: "Derrière le panneau de droite (fichiers…)",
+  bottom: "Dégradé en bas",
+  bottomHint: "Derrière la zone d'écriture",
+  panels: "Panneaux annexes",
+  panelsHint: "Terminal, fichiers et autres panneaux hors conversation",
+  dim: "Voile sur l'image",
+  dimHint: "Assombrit toute l'image pour le texte du chat",
+  none: "Aucun",
+  error: "Erreur",
+  errors: {
+    unsupported_format: "Format non pris en charge (jpg, png, gif ou webp)",
+    too_large: "Image trop lourde (20 Mo maximum)",
+    not_found: "Fichier introuvable",
+    not_a_file: "Ce n'est pas un fichier",
+    plugin_dir_missing: "Dossier du plugin introuvable",
+    settings_invalid: "Réglages illisibles",
+    no_upload: "Aucun envoi en cours",
+    upload_mismatch: "Envoi plus gros qu'annoncé",
+    upload_incomplete: "Envoi incomplet",
+  } as Record<string, string>,
+};
+
+type Texts = typeof fr;
+
+const en: Texts = {
+  language: "Language",
+  languageHint: "Auto follows Paseo's language",
+  auto: "Auto",
+  loading: "Loading…",
+  settingsInvalid: "Settings unreadable: ",
+  sectionWallpaper: "Wallpaper",
+  show: "Show wallpaper",
+  showHint: "Desktop and web apps only",
+  choose: "Choose an image",
+  chooseHint: "On this device; it is copied to the machine running Paseo",
+  browse: "Browse…",
+  upload: "Upload",
+  uploading: (name, pct) => `Uploading ${name}… ${pct} %`,
+  uploaded: (name) => `${name} is in place.`,
+  image: "Image",
+  imageHint: "Or a path on the machine running Paseo (jpg, png, gif or webp). Empty: the image bundled with the plugin.",
+  imageError: "Image not found",
+  change: "Change image",
+  apply: "Apply",
+  fit: "Fit",
+  fitHint: "Fill crops a little; “blurred edges” shows the whole image without black bars",
+  fitCover: "Fill window",
+  fitBlur: "Whole image, blurred edges",
+  fitContain: "Whole image, black bars",
+  sharpness: "Sharpness",
+  sharpnessNone: "Available in the desktop app once the image is shown.",
+  sizes: (iw, ih, ww, wh) => `Image ${iw} × ${ih} · window ${ww} × ${wh}`,
+  sharp: ": sharp (downscaled or actual size).",
+  blurry: (factor, need) => `Stretched ×${factor}: it will look blurry. Use an image of at least ${need}.`,
+  sectionReadability: "Readability",
+  left: "Left gradient",
+  leftHint: "Behind the sidebar and its buttons",
+  right: "Right gradient",
+  rightHint: "Behind the right panel (files…)",
+  bottom: "Bottom gradient",
+  bottomHint: "Behind the composer",
+  panels: "Side panels",
+  panelsHint: "Terminal, files and other non-chat panels",
+  dim: "Image veil",
+  dimHint: "Darkens the whole image for the chat text",
+  none: "None",
+  error: "Error",
+  errors: {
+    unsupported_format: "Unsupported format (jpg, png, gif or webp)",
+    too_large: "Image too large (20 MB maximum)",
+    not_found: "File not found",
+    not_a_file: "Not a file",
+    plugin_dir_missing: "Plugin folder not found",
+    settings_invalid: "Settings unreadable",
+    no_upload: "No upload in progress",
+    upload_mismatch: "Upload larger than announced",
+    upload_incomplete: "Upload incomplete",
+  },
+};
+
+export const TEXTS: Record<Lang, Texts> = { fr, en };
+
+export function resolveLang(setting: LanguageSetting, appLocale: string): Lang {
+  if (setting === "fr" || setting === "en") return setting;
+  return appLocale.toLowerCase().startsWith("fr") ? "fr" : "en";
+}
+
+/** Traduit une erreur du daemon (« aw:code|détail ») ; les autres messages restent tels quels. */
+export function translateError(message: string, lang: Lang): string {
+  const match = message.match(/aw:([a-z_]+)\|([^"\]\n]*)/);
+  if (!match) return message;
+  const label = TEXTS[lang].errors[match[1]] ?? match[1];
+  const separator = lang === "fr" ? " : " : ": ";
+  return match[2] ? label + separator + match[2] : label;
+}

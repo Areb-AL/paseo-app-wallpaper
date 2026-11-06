@@ -1,7 +1,7 @@
 import type { PluginClientContext, PluginSidebarItemProps } from "@getpaseo/plugin/client";
 import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import { BackgroundSettings } from "./client/settings";
-import { setLastError, setRefresher } from "./client/state";
+import { setAppLocale, setLastError, setRefresher } from "./client/state";
 import { createBackground, isWeb } from "./client/web";
 import { getBackground, probeLayout } from "./shared/background";
 
@@ -10,6 +10,11 @@ const PROBE = false;
 
 export default function contribute(client: PluginClientContext) {
   const background = createBackground();
+  try {
+    setAppLocale(client.i18n?.locale ?? "en");
+  } catch {
+    setAppLocale("en");
+  }
   let alive = true;
 
   const refresh = () => {
@@ -36,7 +41,7 @@ export default function contribute(client: PluginClientContext) {
     }, 4000);
   }
 
-  const removeSettings = client.addSettingsScreen({ id: "background", title: "Réglages", icon: "Image", Component: BackgroundSettings });
+  const removeSettings = client.addSettingsScreen({ id: "background", title: "Wallpaper", icon: "Image", Component: BackgroundSettings });
   // Entrée de la barre latérale : ouvre directement les réglages du fond.
   const AppWallpaperItem = (_props: PluginSidebarItemProps) => <SidebarRow icon="Image" onPress={() => client.openSettings("background")} />;
   const removeSidebar = client.addSidebarHeaderItem({ id: "app-wallpaper", title: "App Wallpaper", Component: AppWallpaperItem });

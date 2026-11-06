@@ -8,12 +8,13 @@ Trois modes de cadrage sont proposés : remplir la fenêtre (rogne un peu), imag
 
 ## Mise en place
 
-Nécessite Paseo 0.15.2 ou plus récent. Ouvrez App Wallpaper depuis la barre latérale ou depuis les réglages du plugin, puis indiquez le chemin d'une image sur la machine où tourne le daemon Paseo (par exemple `~/Pictures/fond.jpg`). Les formats JPG, PNG, WebP et GIF animé sont acceptés, jusqu'à 20 Mo. Sans chemin, une image fournie en 5120 × 1440 est utilisée. Pour un rendu net, choisissez une image au moins aussi grande que votre fenêtre, en paysage.
+Nécessite Paseo 0.15.2 ou plus récent. Ouvrez App Wallpaper depuis la barre latérale ou depuis les réglages du plugin, puis cliquez sur **Parcourir…** pour choisir une image sur votre appareil, ou indiquez le chemin d'une image sur la machine où tourne le daemon Paseo (par exemple `~/Pictures/fond.jpg`). Les formats JPG, PNG, WebP et GIF animé sont acceptés, jusqu'à 20 Mo. Sans chemin, une image fournie en 5120 × 1440 est utilisée. Pour un rendu net, choisissez une image au moins aussi grande que votre fenêtre, en paysage.
 
-Le fond s'affiche dans l'application de bureau (testée sur macOS et Windows ; Linux utilise la même application mais n'a pas été testé) et dans l'application web. Les applications iOS et Android sont natives et n'ont pas de page à modifier : le plugin n'y a aucun effet. L'écran de réglages est en français.
+Le fond s'affiche dans l'application de bureau (testée sur macOS et Windows ; Linux utilise la même application mais n'a pas été testé) et dans l'application web. Les applications iOS et Android sont natives et n'ont pas de page à modifier : le plugin n'y a aucun effet. L'écran de réglages est disponible en français et en anglais.
 
 ## Données et autorisations
 
+- Une image choisie avec **Parcourir…** est envoyée au daemon et enregistrée dans `$PASEO_HOME/plugin-data/app-wallpaper/wallpaper-<heure>.<ext>` ; seule la dernière est conservée.
 - Le daemon lit le fichier image au chemin indiqué, seulement s'il a une extension d'image et pèse 20 Mo au plus, puis l'envoie aux applications Paseo connectées à ce daemon. L'image n'est envoyée nulle part ailleurs.
 - Le plugin lit le fichier de configuration de Paseo (`$PASEO_HOME/config.json`) pour trouver son dossier d'installation et l'image fournie.
 - Les réglages sont enregistrés par Paseo sur la machine du daemon et partagés par toutes les applications qui y sont connectées.

@@ -30,6 +30,7 @@ for long chats. Swap the image whenever you like; the readability stays.
 - **Sharpness check** — tells you live whether your image is downscaled (sharp) or stretched (blurry),
   and the minimum size to aim for.
 - **Ultrawide-ready** — built and tested on a 5120 × 1440 (32:9) monitor.
+- **Pick a file** — choose the image with your device's file picker; no path to type.
 - **One click away** — an *App Wallpaper* entry in the sidebar opens the settings.
 
 ## 📸 Screenshots
@@ -78,7 +79,8 @@ Open **App Wallpaper** in the sidebar (or *Settings → Plugins → App Wallpape
 | Setting | What it does |
 | --- | --- |
 | **Show wallpaper** | Turns the plugin on or off. |
-| **Image** | Path to an image on the daemon host, e.g. `~/Pictures/wallpaper.jpg`, then **Apply**. Leave empty for the bundled `assets/default-5120x1440.jpg` (procedural violet halftone clouds). |
+| **Choose an image** | **Parcourir…** opens your device's file picker; the image is copied to the daemon host (`$PASEO_HOME/plugin-data/app-wallpaper/`). |
+| **Image** | Or a path to an image on the daemon host, e.g. `~/Pictures/wallpaper.jpg`, then **Apply**. Leave empty for the bundled `assets/default-5120x1440.jpg` (procedural violet halftone clouds). |
 | **Fit** | *Fill window* (crops a little), *Whole image, blurred edges*, or *Whole image, black bars*. |
 | **Sharpness** | Image size vs. window size, with a warning when the image is stretched. |
 | **Left / Right / Bottom gradient** | Strength of each gradient, from none to 100 %. |
@@ -127,7 +129,7 @@ is an independent project, not affiliated with Chat Polish.
   (`left-sidebar-resize-handle`, `message-input-root`, `agent-chat-scroll`…), which are not a public
   API: a Paseo update can break it.
 - No effect on the iOS and Android apps.
-- The settings screen is in French for now.
+- The settings screen is in French and English (Auto follows Paseo's language).
 - The image path is read on the machine running the Paseo daemon, not on the device you are using.
 
 ## 🩺 Troubleshooting

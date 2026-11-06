@@ -3,14 +3,14 @@ import { readFileSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { extname, isAbsolute, join } from "node:path";
-import type { BackgroundView, backgroundSettings } from "../shared/background";
+import { MAX_IMAGE_BYTES, type BackgroundView, type backgroundSettings } from "../shared/background";
 
 type Settings = PluginSettings<(typeof backgroundSettings)["schema"]>;
 
-const PLUGIN_ID = "app-wallpaper";
+export const PLUGIN_ID = "app-wallpaper";
 const DEFAULT_IMAGE = "assets/default-5120x1440.jpg";
-const MAX_BYTES = 20 * 1024 * 1024;
-const MIME: Record<string, string> = {
+const MAX_BYTES = MAX_IMAGE_BYTES;
+export const MIME: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".png": "image/png",
@@ -18,7 +18,7 @@ const MIME: Record<string, string> = {
   ".webp": "image/webp",
 };
 
-const paseoHome = () => process.env.PASEO_HOME || join(homedir(), ".paseo");
+export const paseoHome = () => process.env.PASEO_HOME || join(homedir(), ".paseo");
 
 /**
  * Dossier du plugin. Paseo évalue le bundle serveur depuis une chaîne (import.meta.url est vide) :
@@ -63,10 +63,12 @@ let cache: { key: string; dataUrl: string } | undefined;
 
 async function loadImage(path: string): Promise<{ key: string; dataUrl: string }> {
   const mime = MIME[extname(path).toLowerCase()];
-  if (!mime) throw new Error("Format non pris en charge (jpg, png, gif ou webp) : " + path);
-  const info = await stat(path);
-  if (!info.isFile()) throw new Error("Ce n'est pas un fichier : " + path);
-  if (info.size > MAX_BYTES) throw new Error("Image trop lourde (20 Mo maximum) : " + path);
+  if (!mime) throw new Error("aw:unsupported_format|" + path);
+  const info = await stat(path).catch(() => {
+    throw new Error("aw:not_found|" + path);
+  });
+  if (!info.isFile()) throw new Error("aw:not_a_file|" + path);
+  if (info.size > MAX_BYTES) throw new Error("aw:too_large|" + path);
   const key = path + ":" + info.mtimeMs + ":" + info.size;
   if (cache?.key === key) return cache;
   const bytes = await readFile(path);
@@ -76,7 +78,7 @@ async function loadImage(path: string): Promise<{ key: string; dataUrl: string }
 
 export async function readBackground(settings: Settings): Promise<BackgroundView> {
   const state = await settings.read();
-  if (state.status !== "ready") throw new Error("Réglages du fond illisibles");
+  if (state.status !== "ready") throw new Error("aw:settings_invalid|");
   const values = state.values;
   const base = {
     enabled: values.enabled,
@@ -88,13 +90,13 @@ export async function readBackground(settings: Settings): Promise<BackgroundView
     panelShade: values.panelShade,
   };
   const path = resolveImage(values.imagePath);
-  if (!path) return { ...base, dataUrl: null, imageKey: "", error: "Dossier du plugin introuvable" };
+  if (!path) return { ...base, dataUrl: null, imageKey: "", error: "aw:plugin_dir_missing|" };
   try {
     const image = await loadImage(path);
     return { ...base, dataUrl: image.dataUrl, imageKey: image.key, error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("[app-wallpaper] image illisible", message);
+    console.error("[app-wallpaper] image unreadable", message);
     return { ...base, dataUrl: null, imageKey: "", error: message };
   }
 }

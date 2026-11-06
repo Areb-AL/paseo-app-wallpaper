@@ -14,6 +14,8 @@ export const backgroundSettings = defineSettings({
   version: 1,
   schema: z.object({
     enabled: z.boolean().default(true),
+    /** Langue de l'écran de réglages : auto (celle de Paseo), français ou anglais. */
+    language: z.enum(["auto", "fr", "en"]).default("auto"),
     /** Chemin de l'image sur la machine du daemon (absolu ou avec ~). Vide : l'image fournie avec le plugin. */
     imagePath: z.string().default(""),
     fit: fit.default("cover"),
@@ -57,4 +59,32 @@ export const probeLayout = defineRpc({
   name: "debug.probe",
   input: z.object({ report: z.string().max(200_000) }),
   output: z.object({ ok: z.boolean() }),
+});
+
+/** Taille maximale d'une image, partagée par la lecture et l'envoi. */
+export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+/**
+ * Taille d'un morceau envoyé (avant base64, soit environ 4 Mo une fois encodé) : bien sous la limite
+ * d'Android (16 Mo par envoi). Les morceaux voyagent en base64 dans du JSON, car l'envoi binaire
+ * (Uint8Array) demande une version de Paseo plus récente que 0.15.2.
+ */
+export const UPLOAD_CHUNK_BYTES = 3 * 1024 * 1024;
+
+/** Envoi d'une image choisie dans l'appli : début (nom et taille), morceaux binaires, fin. */
+export const uploadStart = defineRpc({
+  name: "upload.start",
+  input: z.object({ name: z.string().min(1).max(255), size: z.number().int().positive().max(MAX_IMAGE_BYTES) }),
+  output: z.object({ ok: z.boolean() }),
+});
+
+export const uploadChunk = defineRpc({
+  name: "upload.chunk",
+  input: z.object({ data: z.string().max(6 * 1024 * 1024) }),
+  output: z.object({ received: z.number() }),
+});
+
+export const uploadFinish = defineRpc({
+  name: "upload.finish",
+  input: z.object({}),
+  output: z.object({ path: z.string() }),
 });
