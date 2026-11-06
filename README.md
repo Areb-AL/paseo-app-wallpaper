@@ -161,6 +161,9 @@ paseo plugin reload app-wallpaper
 paseo plugin logs app-wallpaper
 ```
 
+Work happens on the `dev` branch; `main` only moves at releases, so installs from GitHub
+(`paseo plugin update`) always get a finished version.
+
 Plugin docs: <https://paseo.sh/docs/plugins>
 
 ## 🗺️ Roadmap
