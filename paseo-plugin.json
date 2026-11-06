@@ -1,0 +1,13 @@
+{
+  "id": "app-wallpaper",
+  "name": "App Wallpaper",
+  "description": "Puts an image behind the Paseo app, with adjustable gradients and veils so the sidebar, the composer and side panels stay readable.",
+  "media": [
+    "screenshots/1-accueil.jpg",
+    "screenshots/2-conversations.jpg",
+    "screenshots/3-reglages.jpg"
+  ],
+  "requirements": {
+    "paseo": ">=0.15.2"
+  }
+}
