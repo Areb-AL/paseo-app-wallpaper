@@ -91,6 +91,18 @@ Use an image **at least as large as your window**, in landscape:
 
 Smaller images get stretched. To enlarge one cleanly, see `tools/upscale.sh` below.
 
+## 🤝 Works well with
+
+- **[Chat Polish](https://github.com/lthieu96/paseo-chat-polish)** by [@lthieu96](https://github.com/lthieu96)
+  (`paseo plugin add lthieu96/chat-polish`) — redraws the chat timeline as one clean column and
+  lets you build a custom theme with live contrast checks. App Wallpaper paints the background,
+  Chat Polish polishes what sits on top: a dark theme whose **raised** and **control** colors
+  match your wallpaper makes message cards and the composer blend in. Its themes also apply on
+  iOS and Android, where App Wallpaper cannot draw.
+
+Both plugins restyle Paseo's own interface and are designed to run side by side. App Wallpaper
+is an independent project, not affiliated with Chat Polish.
+
 ## ⚙️ How it works
 
 - `server/background.ts` reads the settings, loads the image from disk and sends it to the app.
