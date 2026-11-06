@@ -1,0 +1,21 @@
+App Wallpaper puts an image behind the whole Paseo app and adds adjustable layers on top so the interface stays readable: a gradient behind the sidebar, one behind the panel docked on the right, one behind the composer, a veil over the whole image and a veil on side panels such as the terminal or the file explorer. The image itself is never modified, so you can swap it at any time.
+
+## How it works
+
+The gradients follow the real layout. The plugin measures the sidebar, the right panel and the composer, and resizes the gradients when you resize them. Chats stay clear so the image shows through; message cards, the composer, dialogs and menus keep their own background. Large panels that are not a chat get the side-panel veil.
+
+Three fit modes are available: fill the window (crops a little), show the whole image with blurred edges, or show the whole image with black bars. A sharpness indicator compares the image size with the window size and warns when the image is stretched.
+
+## Setup
+
+Requires Paseo 0.15.2 or later. Open App Wallpaper from the sidebar, or from the plugin's settings, then enter the path of an image on the machine running the Paseo daemon (for example `~/Pictures/wallpaper.jpg`). JPG, PNG, WebP and animated GIF are supported, up to 20 MB. With no path, a bundled 5120 × 1440 image is used. For a sharp result, use an image at least as large as your window, in landscape.
+
+The wallpaper appears in the desktop app (tested on macOS; Windows and Linux use the same app but are untested) and in the web app. The iOS and Android apps are native and have no page to restyle, so the plugin has no effect there. The settings screen is in French for now.
+
+## Data and permissions
+
+- The daemon reads the image file from the path you enter, only if it has an image extension and is 20 MB or less, and sends it to the Paseo apps connected to that daemon. The image is not uploaded anywhere else.
+- The plugin reads Paseo's own configuration file (`$PASEO_HOME/config.json`) to find its installation folder and the bundled image.
+- Settings are stored by Paseo on the daemon host and shared by every app connected to it.
+- The plugin makes no network requests, collects no data and sends nothing to agent providers.
+- In the desktop and web apps, it adds a style sheet and a few attributes to Paseo's interface. It relies on internal markers of the Paseo interface that are not a public API, so a Paseo update can stop parts of it from applying until the plugin is updated.

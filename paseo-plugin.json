@@ -9,5 +9,10 @@
   ],
   "requirements": {
     "paseo": ">=0.15.2"
+  },
+  "translations": {
+    "fr": {
+      "description": "Met une image en fond de l'application Paseo, avec des dégradés et des voiles réglables pour garder la barre latérale, la zone d'écriture et les panneaux lisibles."
+    }
   }
 }
