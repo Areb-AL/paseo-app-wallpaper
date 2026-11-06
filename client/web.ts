@@ -258,6 +258,9 @@ function clearLayout(root: El, side: number, shadePanels: boolean, report?: stri
         r.left >= side - 4 &&
         // Un panneau annexe, pas toute la zone de contenu.
         r.width < (vw - side) * 0.7 &&
+        // Panneau annexe seulement à côté d'une conversation, ou collé au bord droit (fichiers).
+        // Sans conversation à l'écran (paramètres, pages de plugins), pas de rectangle voilé.
+        (chats.length > 0 || r.right >= vw - 4) &&
         !overlapsChat(r) &&
         !child.matches(SETTINGS) &&
         !child.closest(SETTINGS) &&
