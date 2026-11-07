@@ -66,6 +66,7 @@ declare class Blob {
   constructor(parts: Uint8Array[], options: { type: string });
 }
 interface VideoEl extends El {
+  readyState: number;
   src: string;
   muted: boolean;
   loop: boolean;
@@ -313,11 +314,34 @@ html[${FOCUS}="dim"] body::before { opacity: 1; background: rgb(0 0 0 / 0.55); }
   position: fixed;
   z-index: -1;
   pointer-events: none;
+}
+/*
+ * Flou progressif : trois couches empilées, chacune masquée par un dégradé (bords → centre).
+ * Une couche de flou léger et large, une de flou fort et resserrée, puis le voile sombre.
+ * Le passage du net au flou se fait donc en douceur, sur les côtés et en haut.
+ */
+#${GLASS_ID} > div > div {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+#${GLASS_ID} > div > div:nth-child(1) {
+  backdrop-filter: blur(5px) saturate(0.95);
+  -webkit-backdrop-filter: blur(5px) saturate(0.95);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent), linear-gradient(to bottom, transparent, #000 140px);
+  mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent), linear-gradient(to bottom, transparent, #000 140px);
+}
+#${GLASS_ID} > div > div:nth-child(2) {
+  backdrop-filter: blur(22px) saturate(0.9);
+  -webkit-backdrop-filter: blur(22px) saturate(0.9);
+  -webkit-mask-image: linear-gradient(to right, transparent 6%, #000 32%, #000 68%, transparent 94%), linear-gradient(to bottom, transparent 60px, #000 260px);
+  mask-image: linear-gradient(to right, transparent 6%, #000 32%, #000 68%, transparent 94%), linear-gradient(to bottom, transparent 60px, #000 260px);
+}
+#${GLASS_ID} > div > div:nth-child(3) {
   background: rgb(0 0 0 / var(--aw-glass, 0));
-  backdrop-filter: blur(18px) saturate(0.9);
-  -webkit-backdrop-filter: blur(18px) saturate(0.9);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent);
-  mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 22%, #000 78%, transparent), linear-gradient(to bottom, transparent, #000 180px);
+  mask-image: linear-gradient(to right, transparent, #000 22%, #000 78%, transparent), linear-gradient(to bottom, transparent, #000 180px);
 }
 @media (prefers-reduced-motion: reduce) {
   html::after, #${VIDEO_ID} { animation: none !important; }
@@ -469,6 +493,11 @@ export interface BackgroundController {
 export function createBackground(): BackgroundController {
   if (!isWeb()) return { apply: () => {}, probe: () => "pas de page web (mobile)", stop: () => {} };
   let video: VideoEl | undefined;
+  const removeMedia = () => {
+    video?.pause();
+    video?.remove();
+    video = undefined;
+  };
   // Vidéo en pause quand la fenêtre est cachée ou réduite, pour économiser la batterie.
   const onVisibility = () => {
     if (!video) return;
@@ -511,7 +540,11 @@ export function createBackground(): BackgroundController {
       glassBox.setAttribute("id", GLASS_ID);
       document.documentElement.appendChild(glassBox);
     }
-    while (glassBox.childElementCount < columns.length) glassBox.appendChild(document.createElement("div"));
+    while (glassBox.childElementCount < columns.length) {
+      const pane = document.createElement("div");
+      for (let layer = 0; layer < 3; layer++) pane.appendChild(document.createElement("div"));
+      glassBox.appendChild(pane);
+    }
     while (glassBox.childElementCount > columns.length) glassBox.children[glassBox.childElementCount - 1].remove();
     columns.forEach((col, i) => {
       const pane = glassBox!.children[i];
@@ -545,9 +578,7 @@ export function createBackground(): BackgroundController {
     style = undefined;
     glassBox?.remove();
     glassBox = undefined;
-    video?.pause();
-    video?.remove();
-    video = undefined;
+    removeMedia();
     document.removeEventListener("visibilitychange", onVisibility);
     document.documentElement.removeAttribute(FOCUS);
     imageKey = "";
@@ -593,25 +624,22 @@ export function createBackground(): BackgroundController {
         // Les URL appartiennent au téléchargeur (index.client.tsx), qui les libère.
         objectUrl = url;
         if (isVideo) {
-          if (!video) {
-            video = document.createElement("video");
-            video.setAttribute("id", VIDEO_ID);
-            video.muted = true;
-            video.loop = true;
-            video.autoplay = true;
-            video.playsInline = true;
-            const current = video;
-            current.addEventListener("loadedmetadata", () => {
-              imageSize = { width: current.videoWidth, height: current.videoHeight, fit: view.fit };
-            });
-            document.documentElement.appendChild(video);
-          }
-          video.src = url;
-          if (document.visibilityState !== "hidden") video.play().catch(() => {});
+          removeMedia();
+          const source = document.createElement("video");
+          source.setAttribute("id", VIDEO_ID);
+          source.muted = true;
+          source.loop = true;
+          source.autoplay = true;
+          source.playsInline = true;
+          source.addEventListener("loadedmetadata", () => {
+            imageSize = { width: source.videoWidth, height: source.videoHeight, fit: view.fit };
+          });
+          video = source;
+          document.documentElement.appendChild(source);
+          source.src = url;
+          if (document.visibilityState !== "hidden") source.play().catch(() => {});
         } else {
-          video?.pause();
-          video?.remove();
-          video = undefined;
+          removeMedia();
           const probe = new Image();
           probe.onload = () => {
             imageSize = { width: probe.naturalWidth, height: probe.naturalHeight, fit: view.fit };

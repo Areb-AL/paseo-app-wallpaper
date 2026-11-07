@@ -58,7 +58,15 @@ export const backgroundView = z.object({
    * null s'il n'a pas pu être lu. key identifie le fichier (chemin, date, taille).
    */
   media: z
-    .object({ key: z.string(), mime: z.string(), size: z.number(), kind: z.enum(["image", "video"]), chunks: z.number() })
+    .object({
+      key: z.string(),
+      mime: z.string(),
+      size: z.number(),
+      kind: z.enum(["image", "video"]),
+      /** Codec vidéo détecté (h264, hevc, vp9, av1), null pour une image ou si inconnu. */
+      codec: z.string().nullable(),
+      chunks: z.number(),
+    })
     .nullable(),
   error: z.string().nullable(),
   fit,

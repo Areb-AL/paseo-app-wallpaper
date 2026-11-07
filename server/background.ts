@@ -77,13 +77,34 @@ async function describeMedia(path: string): Promise<NonNullable<BackgroundView["
   known.delete(key);
   known.set(key, path);
   while (known.size > 6) known.delete(known.keys().next().value as string);
+  const kind = mime.startsWith("video/") ? "video" : "image";
   return {
     key,
     mime,
     size: info.size,
-    kind: mime.startsWith("video/") ? "video" : "image",
+    kind,
+    codec: kind === "video" ? await detectCodec(path, info.size).catch(() => null) : null,
     chunks: Math.max(1, Math.ceil(info.size / UPLOAD_CHUNK_BYTES)),
   };
+}
+
+/** Codec vidéo d'un MP4/WebM, lu dans les premiers et derniers Mo du fichier (balises avc1, hvc1…). */
+async function detectCodec(path: string, size: number): Promise<string | null> {
+  const handle = await open(path, "r");
+  try {
+    const span = Math.min(size, 2 * 1024 * 1024);
+    const head = Buffer.alloc(span);
+    await handle.read(head, 0, span, 0);
+    const tail = Buffer.alloc(span);
+    await handle.read(tail, 0, span, Math.max(0, size - span));
+    const text = head.toString("latin1") + tail.toString("latin1");
+    for (const [tag, codec] of [["hvc1", "hevc"], ["hev1", "hevc"], ["avc1", "h264"], ["av01", "av1"], ["vp09", "vp9"], ["V_VP9", "vp9"], ["V_AV1", "av1"], ["V_MPEG4/ISO/AVC", "h264"]] as const) {
+      if (text.includes(tag)) return codec;
+    }
+    return null;
+  } finally {
+    await handle.close();
+  }
 }
 
 /** Lit un morceau du fichier sur le disque, sans charger le fichier entier en mémoire. */

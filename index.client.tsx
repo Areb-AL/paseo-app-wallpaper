@@ -1,7 +1,7 @@
 import type { PluginClientContext, PluginSidebarItemProps } from "@getpaseo/plugin/client";
 import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import { BackgroundSettings } from "./client/settings";
-import { setAppLocale, setLastError, setRefresher } from "./client/state";
+import { setAppLocale, setLastError, setLastMedia, setRefresher } from "./client/state";
 import { chunksToObjectUrl, createBackground, isPortraitWindow, isWeb, revokeObjectUrl, watchOrientation } from "./client/web";
 import { getBackground, mediaChunk, probeLayout, type BackgroundView } from "./shared/background";
 
@@ -56,6 +56,7 @@ export default function contribute(client: PluginClientContext) {
       .then((view) => {
         if (!alive) return;
         setLastError(view.error);
+        setLastMedia(view.media ? { kind: view.media.kind, codec: view.media.codec } : null);
         // Rotation : on redemande l'image au moment du prochain changement.
         if (rotationTimer) clearTimeout(rotationTimer);
         rotationTimer = undefined;
