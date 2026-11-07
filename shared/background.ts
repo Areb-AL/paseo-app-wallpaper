@@ -63,8 +63,6 @@ export const backgroundView = z.object({
       mime: z.string(),
       size: z.number(),
       kind: z.enum(["image", "video"]),
-      /** Codec vidéo détecté (h264, hevc, vp9, av1), null pour une image ou si inconnu. */
-      codec: z.string().nullable(),
       chunks: z.number(),
     })
     .nullable(),

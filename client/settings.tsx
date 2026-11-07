@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { Text } from "react-native";
 import { backgroundSettings, galleryRemove, LEVELS, MAX_IMAGE_BYTES, UPLOAD_CHUNK_BYTES, uploadChunk, uploadFinish, uploadStart } from "../shared/background";
 import { resolveLang, TEXTS, translateError, type LanguageSetting } from "./i18n";
-import { getAppLocale, getLastError, getLastMedia, refreshBackground } from "./state";
+import { getAppLocale, getLastError, refreshBackground } from "./state";
 import { isWeb, pickImageFile, sharpness, toBase64, type Sharpness } from "./web";
 
 type Values = {
@@ -50,13 +50,11 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
   const [upload, setUpload] = useState<{ text: string; error?: string } | null>(null);
   const [info, setInfo] = useState<Sharpness | undefined>(() => sharpness());
   const [imageError, setImageError] = useState<string | null>(() => getLastError());
-  const [media, setMedia] = useState(() => getLastMedia());
   // L'image se charge et la fenêtre change de taille : on relit la netteté et l'erreur chaque seconde.
   useEffect(() => {
     const timer = setInterval(() => {
       setInfo(sharpness());
       setImageError(getLastError());
-      setMedia(getLastMedia());
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -174,9 +172,6 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
           <SettingsAction label={t.change} actionLabel={t.apply} onPress={() => save({ imagePath: pathInput.current?.getText().trim() ?? "" })} />
           <SettingsSelect label={t.fit} hint={t.fitHint} value={values.fit} options={fitOptions} onValueChange={(fit) => save({ fit: fit as Values["fit"] })} />
           <SettingsRow label={t.sharpness} hint={sharp.text} error={sharp.error} />
-          {media?.kind === "video" && media.codec === "h264" && info && info.imageWidth > 4096 ? (
-            <SettingsRow label={t.videoHeavy} hint={t.videoHeavyCommand} error={t.videoHeavyHint(info.imageWidth)} />
-          ) : null}
         </SettingsCard>
       </SettingsSection>
       <SettingsSection title={t.sectionLook}>

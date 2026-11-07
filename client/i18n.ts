@@ -69,10 +69,6 @@ const fr = {
   motionOff: "Aucun",
   motionSlow: "Lent",
   motionMedium: "Moyen",
-  videoHeavy: "Vidéo gourmande",
-  videoHeavyHint: (width: number) =>
-    `Vidéo H.264 de ${width} px de large : au-delà de 4096 px, la puce graphique ne sait pas la décoder et le processeur s'en charge (très gourmand). Convertis-la en HEVC (même qualité, presque aucun coût) ou réduis-la à 3840 px de large.`,
-  videoHeavyCommand: "Avec ffmpeg : ffmpeg -i video.mp4 -c:v hevc_videotoolbox -q:v 65 -tag:v hvc1 -an video-hevc.mp4",
   sectionGallery: "Galerie",
   rotation: "Changer d'image",
   rotationHint: "Fait défiler les images de la galerie ; « Jamais » garde l'image principale",
@@ -175,10 +171,6 @@ const en: Texts = {
   motionOff: "None",
   motionSlow: "Slow",
   motionMedium: "Medium",
-  videoHeavy: "Heavy video",
-  videoHeavyHint: (width: number) =>
-    `H.264 video ${width} px wide: above 4096 px the graphics chip cannot decode it and the CPU does the work (very heavy). Convert it to HEVC (same quality, almost no cost) or scale it down to 3840 px wide.`,
-  videoHeavyCommand: "With ffmpeg: ffmpeg -i video.mp4 -c:v hevc_videotoolbox -q:v 65 -tag:v hvc1 -an video-hevc.mp4",
   sectionGallery: "Gallery",
   rotation: "Change image",
   rotationHint: "Cycles through the gallery; “Never” keeps the main image",

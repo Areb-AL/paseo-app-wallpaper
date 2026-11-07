@@ -1,7 +1,7 @@
 import type { PluginClientContext, PluginSidebarItemProps } from "@getpaseo/plugin/client";
 import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import { BackgroundSettings } from "./client/settings";
-import { setAppLocale, setLastError, setLastMedia, setRefresher } from "./client/state";
+import { setAppLocale, setLastError, setRefresher } from "./client/state";
 import { chunksToObjectUrl, createBackground, isPortraitWindow, isWeb, revokeObjectUrl, watchOrientation } from "./client/web";
 import { getBackground, mediaChunk, probeLayout, type BackgroundView } from "./shared/background";
 
@@ -16,7 +16,7 @@ export default function contribute(client: PluginClientContext) {
     setAppLocale("en");
   }
   let alive = true;
-  // Fichiers déjà téléchargés (image principale, verticale…) : clé → URL locale. Deux au plus.
+  // Fichier affiché, gardé en mémoire pour ne rien retélécharger quand un réglage change. Un seul à la fois.
   const downloaded = new Map<string, string>();
   let loading: Promise<string> | undefined;
   let loadingKey = "";
@@ -34,7 +34,7 @@ export default function contribute(client: PluginClientContext) {
       }
       const url = chunksToObjectUrl(chunks, media.mime);
       downloaded.set(media.key, url);
-      while (downloaded.size > 2) {
+      while (downloaded.size > 1) {
         const [oldKey, oldUrl] = downloaded.entries().next().value as [string, string];
         downloaded.delete(oldKey);
         revokeObjectUrl(oldUrl);
@@ -56,7 +56,6 @@ export default function contribute(client: PluginClientContext) {
       .then((view) => {
         if (!alive) return;
         setLastError(view.error);
-        setLastMedia(view.media ? { kind: view.media.kind, codec: view.media.codec } : null);
         // Rotation : on redemande l'image au moment du prochain changement.
         if (rotationTimer) clearTimeout(rotationTimer);
         rotationTimer = undefined;

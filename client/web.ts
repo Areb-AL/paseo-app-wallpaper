@@ -67,6 +67,7 @@ declare class Blob {
 }
 interface VideoEl extends El {
   readyState: number;
+  load(): void;
   src: string;
   muted: boolean;
   loop: boolean;
@@ -493,9 +494,13 @@ export interface BackgroundController {
 export function createBackground(): BackgroundController {
   if (!isWeb()) return { apply: () => {}, probe: () => "pas de page web (mobile)", stop: () => {} };
   let video: VideoEl | undefined;
+  // Vider vraiment le lecteur : sans src ni load(), il garde ses images décodées en mémoire un moment.
   const removeMedia = () => {
-    video?.pause();
-    video?.remove();
+    if (!video) return;
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    video.remove();
     video = undefined;
   };
   // Vidéo en pause quand la fenêtre est cachée ou réduite, pour économiser la batterie.
@@ -643,6 +648,8 @@ export function createBackground(): BackgroundController {
           const probe = new Image();
           probe.onload = () => {
             imageSize = { width: probe.naturalWidth, height: probe.naturalHeight, fit: view.fit };
+            probe.onload = null;
+            probe.src = "";
           };
           probe.src = url;
         }

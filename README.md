@@ -116,17 +116,6 @@ Use an image **at least as large as your window**, in landscape:
 
 Smaller images get stretched and look blurry.
 
-### Videos: prefer HEVC
-
-Mac and PC graphics chips decode H.264 only up to **4096 px wide**. A wider H.264 video (such as
-5120 × 1440) is decoded by the CPU instead, which is very heavy. Use **HEVC (H.265)** for wide
-videos — same quality, decoded by the graphics chip up to 8192 px. The settings warn you when a
-video is in this case. With ffmpeg on a Mac:
-
-```bash
-ffmpeg -i video.mp4 -c:v hevc_videotoolbox -q:v 65 -tag:v hvc1 -an video-hevc.mp4
-```
-
 ## 🤝 Works well with
 
 - **[Chat Polish](https://github.com/lthieu96/paseo-chat-polish)** by [@lthieu96](https://github.com/lthieu96)
@@ -167,7 +156,6 @@ is an independent project, not affiliated with Chat Polish.
 | Wallpaper missing | The settings show *Image introuvable* (image not found) with the reason; `paseo plugin logs app-wallpaper` has details. |
 | Blurry image | Look at **Sharpness** and use a larger image. |
 | Black bars | Switch **Fit** to *Fill window* or *Whole image, blurred edges*. |
-| High CPU with a video | It is probably H.264 wider than 4096 px: convert it to HEVC (see *Videos: prefer HEVC*). |
 | Text hard to read | Raise **Image veil** to 65–85 %. |
 
 ## 🛠️ Development

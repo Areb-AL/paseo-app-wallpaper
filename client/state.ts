@@ -20,9 +20,3 @@ export const setAppLocale = (locale: string) => {
 };
 export const getAppLocale = () => appLocale;
 
-/** Fichier affiché (type et codec), pour les conseils de l'écran de réglages. */
-let lastMedia: { kind: "image" | "video"; codec: string | null } | null = null;
-export const setLastMedia = (media: { kind: "image" | "video"; codec: string | null } | null) => {
-  lastMedia = media;
-};
-export const getLastMedia = () => lastMedia;
