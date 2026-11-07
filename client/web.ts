@@ -208,12 +208,18 @@ function css(view: BackgroundView, imageUrl: string): string {
   const blurEdges = view.fit === "blur";
   const size = view.fit === "cover" ? "cover" : "contain";
   const position = FOCAL[view.focal] ?? "center";
-  const filter = `brightness(${view.brightness}) saturate(${view.saturation})${view.imageBlur > 0 ? ` blur(${view.imageBlur}px)` : ""}`;
+  // Pas de filtre quand les retouches sont neutres : un filtre oblige à redessiner l'image à chaque image.
+  const filters = [
+    view.brightness !== 1 ? `brightness(${view.brightness})` : "",
+    view.saturation !== 1 ? `saturate(${view.saturation})` : "",
+    view.imageBlur > 0 ? `blur(${view.imageBlur}px)` : "",
+  ].filter(Boolean);
+  const filter = filters.length > 0 ? filters.join(" ") : "none";
   // Mouvement lent : zoom et glissement doux, en aller-retour. Durée selon la vitesse choisie.
   const duration = view.motion === "medium" ? 40 : 90;
   const motion = view.motion === "off"
     ? ""
-    : `animation: aw-drift ${duration}s ease-in-out infinite alternate; will-change: transform;`;
+    : `animation: aw-drift ${duration}s ease-in-out infinite alternate; will-change: transform; backface-visibility: hidden; transform: translate3d(0, 0, 0);`;
   // Marge pour que les bords ne se voient jamais pendant le mouvement ou avec le flou.
   const bleed = view.motion !== "off" || view.imageBlur > 0 ? "-4%" : "0";
   return `
@@ -243,10 +249,11 @@ body::after {
   background-size: 100% 100%;
   background-repeat: no-repeat;
 }
+/* translate3d/scale3d : calculé par la carte graphique, au sous-pixel près (pas de saccades). */
 @keyframes aw-drift {
-  0% { transform: scale(1.0) translate(0, 0); }
-  50% { transform: scale(1.05) translate(-1.2%, 0.8%); }
-  100% { transform: scale(1.08) translate(1.2%, -0.8%); }
+  0% { transform: translate3d(0, 0, 0) scale3d(1, 1, 1); }
+  50% { transform: translate3d(-1.2%, 0.8%, 0) scale3d(1.05, 1.05, 1); }
+  100% { transform: translate3d(1.2%, -0.8%, 0) scale3d(1.08, 1.08, 1); }
 }
 [${CLEAR}] { background-color: transparent !important; }
 [${SHADE}] { background-color: rgb(0 0 0 / var(--aw-panel)) !important; }
