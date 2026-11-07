@@ -122,7 +122,7 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
       setUpload({ text: t.uploading(file.name, 0) });
       await start({ name: file.name, size: file.size, slot });
       for (let offset = 0; offset < file.size; offset += UPLOAD_CHUNK_BYTES) {
-        await sendChunk({ data: toBase64(file.bytes.subarray(offset, offset + UPLOAD_CHUNK_BYTES)) });
+        await sendChunk({ data: toBase64(await file.read(offset, Math.min(file.size, offset + UPLOAD_CHUNK_BYTES))) });
         const done = Math.min(100, Math.round(((offset + UPLOAD_CHUNK_BYTES) / file.size) * 100));
         setUpload({ text: t.uploading(file.name, done) });
       }

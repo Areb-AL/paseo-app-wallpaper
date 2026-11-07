@@ -53,10 +53,13 @@ export const backgroundSettings = defineSettings({
 
 export const backgroundView = z.object({
   enabled: z.boolean(),
-  /** Image encodée en data URL ; null si elle n'a pas pu être lue. */
-  dataUrl: z.string().nullable(),
-  /** Identifie l'image (chemin + date de modification) pour éviter de la reposer pour rien. */
-  imageKey: z.string(),
+  /**
+   * Le fichier à afficher (image ou vidéo), téléchargé ensuite par morceaux avec mediaChunk ;
+   * null s'il n'a pas pu être lu. key identifie le fichier (chemin, date, taille).
+   */
+  media: z
+    .object({ key: z.string(), mime: z.string(), size: z.number(), kind: z.enum(["image", "video"]), chunks: z.number() })
+    .nullable(),
   error: z.string().nullable(),
   fit,
   dim: level,
@@ -92,8 +95,8 @@ export const probeLayout = defineRpc({
   output: z.object({ ok: z.boolean() }),
 });
 
-/** Taille maximale d'une image, partagée par la lecture et l'envoi. */
-export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+/** Taille maximale d'une image ou d'une vidéo, partagée par la lecture et l'envoi. */
+export const MAX_IMAGE_BYTES = 200 * 1024 * 1024;
 /**
  * Taille d'un morceau envoyé (avant base64, soit environ 4 Mo une fois encodé) : bien sous la limite
  * d'Android (16 Mo par envoi). Les morceaux voyagent en base64 dans du JSON, car l'envoi binaire
@@ -130,4 +133,11 @@ export const galleryRemove = defineRpc({
   name: "gallery.remove",
   input: z.object({ path: z.string() }),
   output: z.object({ deleted: z.boolean() }),
+});
+
+/** Un morceau du fichier à afficher, en base64 (l'envoi binaire demande un Paseo plus récent que 0.15.2). */
+export const mediaChunk = defineRpc({
+  name: "media.chunk",
+  input: z.object({ key: z.string(), index: z.number().int().min(0) }),
+  output: z.object({ data: z.string() }),
 });

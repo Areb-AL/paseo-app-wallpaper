@@ -1,33 +1,46 @@
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join } from "node:path";
 import { MAX_IMAGE_BYTES } from "../shared/background";
 import { MIME, PLUGIN_ID, paseoHome } from "./background";
 
 /**
- * Reçoit une image choisie dans l'appli et l'enregistre dans le dossier de données du plugin
- * ($PASEO_HOME/plugin-data/app-wallpaper). Un seul envoi à la fois : un nouveau début annule le précédent.
+ * Reçoit une image ou une vidéo choisie dans l'appli et l'enregistre dans le dossier de données du plugin
+ * ($PASEO_HOME/plugin-data/app-wallpaper). Les morceaux sont écrits au fur et à mesure dans un fichier
+ * temporaire (pas de fichier entier en mémoire). Un seul envoi à la fois : un nouveau début annule le précédent.
  */
-let pending: { ext: string; size: number; received: number; chunks: Uint8Array[]; prefix: string } | undefined;
+let pending: { ext: string; size: number; received: number; prefix: string; temp: string } | undefined;
 
 export const dataDir = () => join(paseoHome(), "plugin-data", PLUGIN_ID);
 
-export function startUpload({ name, size, slot }: { name: string; size: number; slot: "landscape" | "portrait" | "gallery" }) {
+export async function startUpload({ name, size, slot }: { name: string; size: number; slot: "landscape" | "portrait" | "gallery" }) {
   const ext = extname(name).toLowerCase();
   if (!MIME[ext]) throw new Error("aw:unsupported_format|" + name);
   if (size > MAX_IMAGE_BYTES) throw new Error("aw:too_large|" + name);
-  pending = { ext: ext === ".jpeg" ? ".jpg" : ext, size, received: 0, chunks: [], prefix: slot === "portrait" ? "portrait-" : slot === "gallery" ? "gallery-" : "wallpaper-" };
+  if (pending) await rm(pending.temp, { force: true });
+  const dir = dataDir();
+  await mkdir(dir, { recursive: true });
+  const temp = join(dir, `.upload-${Date.now()}.part`);
+  await writeFile(temp, new Uint8Array(0));
+  pending = {
+    ext: ext === ".jpeg" ? ".jpg" : ext,
+    size,
+    received: 0,
+    prefix: slot === "portrait" ? "portrait-" : slot === "gallery" ? "gallery-" : "wallpaper-",
+    temp,
+  };
   return { ok: true };
 }
 
-export function addChunk({ data }: { data: string }) {
+export async function addChunk({ data }: { data: string }) {
   if (!pending) throw new Error("aw:no_upload|");
   const bytes = Buffer.from(data, "base64");
   pending.received += bytes.byteLength;
   if (pending.received > pending.size) {
+    await rm(pending.temp, { force: true });
     pending = undefined;
     throw new Error("aw:upload_mismatch|");
   }
-  pending.chunks.push(bytes);
+  await appendFile(pending.temp, bytes);
   return { received: pending.received };
 }
 
@@ -35,18 +48,20 @@ export async function finishUpload() {
   const upload = pending;
   pending = undefined;
   if (!upload) throw new Error("aw:no_upload|");
-  if (upload.received !== upload.size) throw new Error("aw:upload_incomplete|");
+  if (upload.received !== upload.size) {
+    await rm(upload.temp, { force: true });
+    throw new Error("aw:upload_incomplete|");
+  }
   const dir = dataDir();
-  await mkdir(dir, { recursive: true });
-  // On ne garde que la dernière image principale et la dernière image verticale ;
-  // les images de la galerie s'accumulent jusqu'à ce qu'on les retire.
+  // On ne garde que le dernier fichier principal et le dernier fichier vertical ;
+  // ceux de la galerie s'accumulent jusqu'à ce qu'on les retire.
   if (upload.prefix !== "gallery-") {
     for (const entry of await readdir(dir)) {
       if (entry.startsWith(upload.prefix)) await rm(join(dir, entry), { force: true });
     }
   }
   const path = join(dir, `${upload.prefix}${Date.now()}${upload.ext}`);
-  await writeFile(path, Buffer.concat(upload.chunks));
+  await rename(upload.temp, path);
   return { path };
 }
 

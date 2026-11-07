@@ -34,6 +34,10 @@ declare const document: {
   getElementById(id: string): El | null;
   createElement(tag: "style" | "div"): El;
   createElement(tag: "input"): FileInput;
+  createElement(tag: "video"): VideoEl;
+  readonly visibilityState: string;
+  addEventListener(type: "visibilitychange", listener: () => void): void;
+  removeEventListener(type: "visibilitychange", listener: () => void): void;
   querySelector(selector: string): El | null;
   querySelectorAll(selector: string): ArrayLike<El>;
   elementsFromPoint(x: number, y: number): El[];
@@ -46,7 +50,8 @@ declare const window: {
   addEventListener(type: "resize", listener: () => void): void;
   removeEventListener(type: "resize", listener: () => void): void;
 };
-interface FileLike { name: string; size: number; arrayBuffer(): Promise<ArrayBuffer> }
+interface BlobLike { arrayBuffer(): Promise<ArrayBuffer> }
+interface FileLike extends BlobLike { name: string; size: number; slice(start: number, end: number): BlobLike }
 interface FileInput {
   type: string;
   accept: string;
@@ -59,6 +64,19 @@ declare function atob(data: string): string;
 declare function btoa(data: string): string;
 declare class Blob {
   constructor(parts: Uint8Array[], options: { type: string });
+}
+interface VideoEl extends El {
+  src: string;
+  muted: boolean;
+  loop: boolean;
+  autoplay: boolean;
+  playsInline: boolean;
+  videoWidth: number;
+  videoHeight: number;
+  paused: boolean;
+  play(): Promise<void>;
+  pause(): void;
+  addEventListener(type: "loadedmetadata", listener: () => void): void;
 }
 declare const URL: { createObjectURL(blob: Blob): string; revokeObjectURL(url: string): void };
 declare class Image {
@@ -79,6 +97,7 @@ declare const MutationObserver: new (cb: () => void) => {
 
 const STYLE_ID = "app-wallpaper-style";
 const GLASS_ID = "app-wallpaper-glass";
+const VIDEO_ID = "app-wallpaper-video";
 const FOCUS = "data-aw-focus";
 const CLEAR = "data-aw-clear";
 const SHADE = "data-aw-shade";
@@ -128,20 +147,22 @@ export function toBase64(bytes: Uint8Array): string {
 }
 
 /** Ouvre le sélecteur de fichiers de l'appareil et renvoie l'image choisie (null si annulé). */
-export function pickImageFile(): Promise<{ name: string; size: number; bytes: Uint8Array } | null> {
+export function pickImageFile(): Promise<{ name: string; size: number; read(start: number, end: number): Promise<Uint8Array> } | null> {
   if (!isWeb()) return Promise.resolve(null);
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "image/jpeg,image/png,image/gif,image/webp";
+    input.accept = "image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,.m4v";
     input.addEventListener("cancel", () => resolve(null));
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return resolve(null);
-      file
-        .arrayBuffer()
-        .then((buffer) => resolve({ name: file.name, size: file.size, bytes: new Uint8Array(buffer) }))
-        .catch(() => resolve(null));
+      // Lecture par morceaux à la demande : une vidéo de 200 Mo n'est jamais chargée d'un coup.
+      resolve({
+        name: file.name,
+        size: file.size,
+        read: (start, end) => file.slice(start, end).arrayBuffer().then((buffer) => new Uint8Array(buffer)),
+      });
     };
     input.click();
   });
@@ -167,18 +188,18 @@ export function watchOrientation(onChange: (portrait: boolean) => void): () => v
 
 export const isWeb = () => Platform.OS === "web" && typeof document !== "undefined";
 
-/**
- * Chrome refuse les URL de plus de 2 Mo : une grande image en data URL serait ignorée (fond noir).
- * On la transforme en Blob local, désigné par une URL courte.
- */
-function toObjectUrl(dataUrl: string): string {
-  const comma = dataUrl.indexOf(",");
-  const mime = dataUrl.slice(5, comma).split(";")[0] || "image/jpeg";
-  const binary = atob(dataUrl.slice(comma + 1));
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return URL.createObjectURL(new Blob([bytes], { type: mime }));
+/** Assemble des morceaux base64 en une URL locale (blob:) ; sans data URL, donc sans limite de 2 Mo. */
+export function chunksToObjectUrl(chunks: string[], mime: string): string {
+  const parts: Uint8Array[] = chunks.map((data) => {
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  });
+  return URL.createObjectURL(new Blob(parts, { type: mime }));
 }
+
+export const revokeObjectUrl = (url: string) => URL.revokeObjectURL(url);
 
 /** Position de l'image selon le point de cadrage choisi. */
 const FOCAL: Record<string, string> = {
@@ -199,7 +220,7 @@ const FOCAL: Record<string, string> = {
  * L'image a son propre calque : elle peut bouger (transform, accéléré par la carte graphique)
  * sans redessiner les dégradés.
  */
-function css(view: BackgroundView, imageUrl: string): string {
+function css(view: BackgroundView, imageUrl: string, isVideo: boolean): string {
   const shades = `
     linear-gradient(to right, rgb(0 0 0 / var(--aw-left)) 0px, rgb(0 0 0 / calc(var(--aw-left) * 0.78)) calc(var(--aw-side) * 0.6), rgb(0 0 0 / calc(var(--aw-left) * 0.6)) var(--aw-side), rgb(0 0 0 / calc(var(--aw-left) * 0.25)) calc(var(--aw-side) + 140px), rgb(0 0 0 / 0) calc(var(--aw-side) + 320px)),
     linear-gradient(to left, rgb(0 0 0 / var(--aw-right, 0)) 0px, rgb(0 0 0 / calc(var(--aw-right, 0) * 0.78)) calc(var(--aw-rside, 0px) * 0.6), rgb(0 0 0 / calc(var(--aw-right, 0) * 0.6)) var(--aw-rside, 0px), rgb(0 0 0 / calc(var(--aw-right, 0) * 0.25)) calc(var(--aw-rside, 0px) + 140px), rgb(0 0 0 / 0) calc(var(--aw-rside, 0px) + 320px)),
@@ -233,15 +254,28 @@ html::before, html::after, body::after {
 html::before {
   inset: -60px;
   z-index: -4;
-  ${blurEdges ? `background: url("${imageUrl}") center / cover no-repeat; filter: blur(40px) brightness(0.55) saturate(1.1);` : "display: none;"}
+  ${blurEdges && !isVideo ? `background: url("${imageUrl}") center / cover no-repeat; filter: blur(40px) brightness(0.55) saturate(1.1);` : "display: none;"}
 }
-html::after {
+${isVideo ? `html::after { display: none; }
+#${VIDEO_ID} {
+  position: fixed;
+  top: ${bleed};
+  left: ${bleed};
+  width: ${bleed === "0" ? "100%" : "108%"};
+  height: ${bleed === "0" ? "100%" : "108%"};
+  z-index: -3;
+  pointer-events: none;
+  object-fit: ${size};
+  object-position: ${position};
+  filter: ${filter};
+  ${motion}
+}` : `html::after {
   inset: ${bleed};
   z-index: -3;
   background: url("${imageUrl}") ${position} / ${size} no-repeat;
   filter: ${filter};
   ${motion}
-}
+}`}
 body::after {
   inset: 0;
   z-index: -2;
@@ -286,7 +320,7 @@ html[${FOCUS}="dim"] body::before { opacity: 1; background: rgb(0 0 0 / 0.55); }
   mask-image: linear-gradient(to right, transparent, #000 72px, #000 calc(100% - 72px), transparent);
 }
 @media (prefers-reduced-motion: reduce) {
-  html::after { animation: none !important; }
+  html::after, #${VIDEO_ID} { animation: none !important; }
   body::before { transition: none; }
 }
 `;
@@ -425,7 +459,8 @@ function measure(): number {
 }
 
 export interface BackgroundController {
-  apply(view: BackgroundView): void;
+  /** Pose le fond ; url est l'URL locale (blob:) du fichier décrit par view.media. */
+  apply(view: BackgroundView, url: string): void;
   /** Renvoie la structure des grands blocs (mise au point). */
   probe(): string;
   stop(): void;
@@ -433,6 +468,13 @@ export interface BackgroundController {
 
 export function createBackground(): BackgroundController {
   if (!isWeb()) return { apply: () => {}, probe: () => "pas de page web (mobile)", stop: () => {} };
+  let video: VideoEl | undefined;
+  // Vidéo en pause quand la fenêtre est cachée ou réduite, pour économiser la batterie.
+  const onVisibility = () => {
+    if (!video) return;
+    if (document.visibilityState === "hidden") video.pause();
+    else video.play().catch(() => {});
+  };
   let style: El | undefined;
   let imageKey = "";
   let styleKey = "";
@@ -503,11 +545,14 @@ export function createBackground(): BackgroundController {
     style = undefined;
     glassBox?.remove();
     glassBox = undefined;
+    video?.pause();
+    video?.remove();
+    video = undefined;
+    document.removeEventListener("visibilitychange", onVisibility);
     document.documentElement.removeAttribute(FOCUS);
     imageKey = "";
     styleKey = "";
     imageSize = undefined;
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = "";
     for (const attr of [CLEAR, SHADE]) {
       const marked = document.querySelectorAll(`[${attr}]`);
@@ -518,8 +563,9 @@ export function createBackground(): BackgroundController {
   };
 
   return {
-    apply(view) {
-      if (!view.enabled || !view.dataUrl) return teardown();
+    apply(view, url) {
+      if (!view.enabled || !view.media || !url) return teardown();
+      const isVideo = view.media.kind === "video";
       const html = document.documentElement;
       html.style.setProperty("--aw-left", String(view.leftShade));
       html.style.setProperty("--aw-bottom", String(view.bottomShade));
@@ -530,8 +576,8 @@ export function createBackground(): BackgroundController {
       focusMode = view.focus;
       glass = view.glass;
       html.style.setProperty("--aw-glass", String(view.glass));
-      // Deux clés : l'image elle-même (à décoder) et l'apparence (style à reconstruire).
-      const fileKey = view.imageKey + ":" + (view.portrait ? "p" : "l");
+      // Deux clés : le fichier lui-même et l'apparence (style à reconstruire).
+      const fileKey = view.media.key + ":" + (view.portrait ? "p" : "l");
       const lookKey = [fileKey, view.fit, view.motion, view.focal, view.brightness, view.saturation, view.imageBlur].join(":");
       if (!style) {
         style = document.createElement("style");
@@ -541,21 +587,42 @@ export function createBackground(): BackgroundController {
         mo.observe(document.body, { childList: true, subtree: true });
         observer = mo;
         window.addEventListener("resize", schedule);
+        document.addEventListener("visibilitychange", onVisibility);
       }
       if (fileKey !== imageKey) {
-        const previous = objectUrl;
-        objectUrl = toObjectUrl(view.dataUrl);
-        const probe = new Image();
-        probe.onload = () => {
-          imageSize = { width: probe.naturalWidth, height: probe.naturalHeight, fit: view.fit };
-        };
-        probe.src = objectUrl;
-        if (previous) URL.revokeObjectURL(previous);
+        // Les URL appartiennent au téléchargeur (index.client.tsx), qui les libère.
+        objectUrl = url;
+        if (isVideo) {
+          if (!video) {
+            video = document.createElement("video");
+            video.setAttribute("id", VIDEO_ID);
+            video.muted = true;
+            video.loop = true;
+            video.autoplay = true;
+            video.playsInline = true;
+            const current = video;
+            current.addEventListener("loadedmetadata", () => {
+              imageSize = { width: current.videoWidth, height: current.videoHeight, fit: view.fit };
+            });
+            document.documentElement.appendChild(video);
+          }
+          video.src = url;
+          if (document.visibilityState !== "hidden") video.play().catch(() => {});
+        } else {
+          video?.pause();
+          video?.remove();
+          video = undefined;
+          const probe = new Image();
+          probe.onload = () => {
+            imageSize = { width: probe.naturalWidth, height: probe.naturalHeight, fit: view.fit };
+          };
+          probe.src = url;
+        }
         imageKey = fileKey;
       }
       if (imageSize) imageSize = { ...imageSize, fit: view.fit };
       if (lookKey !== styleKey) {
-        style.textContent = css(view, objectUrl);
+        style.textContent = css(view, objectUrl, isVideo);
         styleKey = lookKey;
       }
       schedule();
@@ -564,6 +631,7 @@ export function createBackground(): BackgroundController {
       const report: string[] = [`viewport ${window.innerWidth}x${window.innerHeight} dpr=${window.devicePixelRatio} screen=${window.screen.width}x${window.screen.height}`];
       const root = document.getElementById("root") ?? document.body;
       const layout = clearLayout(root, measure(), shadePanels, report);
+      report.push(`loaded ${JSON.stringify(sharpness() ?? null)} video=${!!video}`);
       report.push(`chats ${layout.chats.length} focus=${document.documentElement.getAttribute(FOCUS)} glass=${JSON.stringify(messageColumns(layout.chats))}`);
       const handle = visible(SIDEBAR_HANDLE);
       const composer = visible(COMPOSER);

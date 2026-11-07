@@ -20,7 +20,7 @@ for long chats. Swap the image whenever you like; the readability stays.
 
 ## ✨ Features
 
-- **Any image, untouched** — JPG, PNG, WebP or animated GIF, up to 20 MB. The file is never edited.
+- **Any image, untouched** — JPG, PNG, WebP, animated GIF, MP4 or WebM video, up to 200 MB. The file is never edited.
 - **Layout-aware gradients** — left, right and bottom gradients sized to the *actual* sidebar,
   right panel and composer, and they follow you when you resize them.
 - **Readable everywhere** — a global veil for chat text, and a separate veil for side panels
@@ -132,7 +132,7 @@ is an independent project, not affiliated with Chat Polish.
 
 - `server/background.ts` reads the settings, loads the image from disk and sends it to the app.
 - `client/web.ts` adds a `<style>` tag: the image and the gradients become the page background.
-  Images are passed as a Blob URL, because Chromium rejects data URLs over 2 MB.
+  The file is sent in 3 MB chunks and rebuilt as a Blob URL (Chromium rejects data URLs over 2 MB); videos play in a muted, looping `<video>` element.
 - A `MutationObserver` finds large layout blocks with an opaque background and makes them transparent.
   Large panels that are not a chat get the side-panel veil. Dialogs, menus, message cards and the
   composer keep their own background.
@@ -175,7 +175,8 @@ Plugin docs: <https://paseo.sh/docs/plugins>
 
 ## 🗺️ Roadmap
 
-- Video wallpapers (MP4, WebM).
+- Per-workspace wallpapers.
+- A theme generated from the wallpaper colors.
 
 ## 🤝 Contributing
 

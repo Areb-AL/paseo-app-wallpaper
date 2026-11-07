@@ -10,14 +10,14 @@ Three fit modes are available: fill the window (crops a little), show the whole 
 
 ## Setup
 
-Requires Paseo 0.15.2 or later. Open App Wallpaper from the sidebar, or from the plugin's settings, then click **Parcourir…** to pick an image on your device, or enter the path of an image on the machine running the Paseo daemon (for example `~/Pictures/wallpaper.jpg`). JPG, PNG, WebP and animated GIF are supported, up to 20 MB. With no path, a bundled 5120 × 1440 image is used. For a sharp result, use an image at least as large as your window, in landscape.
+Requires Paseo 0.15.2 or later. Open App Wallpaper from the sidebar, or from the plugin's settings, then click **Parcourir…** to pick an image on your device, or enter the path of an image on the machine running the Paseo daemon (for example `~/Pictures/wallpaper.jpg`). JPG, PNG, WebP, animated GIF and MP4 or WebM videos are supported, up to 200 MB. Videos loop without sound and pause when the window is hidden. With no path, a bundled 5120 × 1440 image is used. For a sharp result, use an image at least as large as your window, in landscape.
 
 The wallpaper appears in the desktop app (tested on macOS and Windows; Linux uses the same app but is untested) and in the web app. The iOS and Android apps are native and have no page to restyle, so the plugin has no effect there. The settings screen is available in French and English.
 
 ## Data and permissions
 
 - An image picked with **Parcourir…** is sent to the daemon and saved as `$PASEO_HOME/plugin-data/app-wallpaper/wallpaper-<time>.<ext>`; only the latest one is kept, except for gallery images, which stay until you remove them from the gallery.
-- The daemon reads the image file from the path you enter, only if it has an image extension and is 20 MB or less, and sends it to the Paseo apps connected to that daemon. The image is not uploaded anywhere else.
+- The daemon reads the image file from the path you enter, only if it has an image or video extension and is 200 MB or less, and sends it in chunks to the Paseo apps connected to that daemon. The image is not uploaded anywhere else.
 - The plugin reads Paseo's own configuration file (`$PASEO_HOME/config.json`) to find its installation folder and the bundled image.
 - Settings are stored by Paseo on the daemon host and shared by every app connected to it.
 - The plugin makes no network requests, collects no data and sends nothing to agent providers.
