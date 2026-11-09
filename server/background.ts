@@ -1,14 +1,14 @@
 import type { PluginSettings } from "@getpaseo/plugin/server";
 import { readFileSync } from "node:fs";
-import { readFile, stat } from "node:fs/promises";
+import { open, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { extname, isAbsolute, join } from "node:path";
-import { MAX_IMAGE_BYTES, type BackgroundView, type backgroundSettings } from "../shared/background";
+import { MAX_IMAGE_BYTES, UPLOAD_CHUNK_BYTES, type BackgroundView, type backgroundSettings } from "../shared/background";
 
 type Settings = PluginSettings<(typeof backgroundSettings)["schema"]>;
 
 export const PLUGIN_ID = "app-wallpaper";
-const DEFAULT_IMAGE = "assets/default-5120x1440.jpg";
+const DEFAULT_IMAGE = "assets/default-3840x3840.jpg";
 const MAX_BYTES = MAX_IMAGE_BYTES;
 export const MIME: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -16,6 +16,9 @@ export const MIME: Record<string, string> = {
   ".png": "image/png",
   ".gif": "image/gif",
   ".webp": "image/webp",
+  ".mp4": "video/mp4",
+  ".m4v": "video/mp4",
+  ".webm": "video/webm",
 };
 
 export const paseoHome = () => process.env.PASEO_HOME || join(homedir(), ".paseo");
@@ -59,9 +62,10 @@ function resolveImage(setting: string): string | undefined {
   return isAbsolute(raw) ? raw : join(homedir(), raw);
 }
 
-let cache: { key: string; dataUrl: string } | undefined;
+/** Fichiers récemment décrits, pour servir leurs morceaux : clé → chemin (quelques entrées). */
+const known = new Map<string, string>();
 
-async function loadImage(path: string): Promise<{ key: string; dataUrl: string }> {
+async function describeMedia(path: string): Promise<NonNullable<BackgroundView["media"]>> {
   const mime = MIME[extname(path).toLowerCase()];
   if (!mime) throw new Error("aw:unsupported_format|" + path);
   const info = await stat(path).catch(() => {
@@ -70,13 +74,34 @@ async function loadImage(path: string): Promise<{ key: string; dataUrl: string }
   if (!info.isFile()) throw new Error("aw:not_a_file|" + path);
   if (info.size > MAX_BYTES) throw new Error("aw:too_large|" + path);
   const key = path + ":" + info.mtimeMs + ":" + info.size;
-  if (cache?.key === key) return cache;
-  const bytes = await readFile(path);
-  cache = { key, dataUrl: "data:" + mime + ";base64," + bytes.toString("base64") };
-  return cache;
+  known.delete(key);
+  known.set(key, path);
+  while (known.size > 6) known.delete(known.keys().next().value as string);
+  const kind = mime.startsWith("video/") ? "video" : "image";
+  return {
+    key,
+    mime,
+    size: info.size,
+    kind,
+    chunks: Math.max(1, Math.ceil(info.size / UPLOAD_CHUNK_BYTES)),
+  };
 }
 
-export async function readBackground(settings: Settings): Promise<BackgroundView> {
+/** Lit un morceau du fichier sur le disque, sans charger le fichier entier en mémoire. */
+export async function readMediaChunk({ key, index }: { key: string; index: number }) {
+  const path = known.get(key);
+  if (!path) throw new Error("aw:not_found|");
+  const handle = await open(path, "r");
+  try {
+    const buffer = Buffer.alloc(UPLOAD_CHUNK_BYTES);
+    const { bytesRead } = await handle.read(buffer, 0, UPLOAD_CHUNK_BYTES, index * UPLOAD_CHUNK_BYTES);
+    return { data: buffer.subarray(0, bytesRead).toString("base64") };
+  } finally {
+    await handle.close();
+  }
+}
+
+export async function readBackground(settings: Settings, wantPortrait = false): Promise<BackgroundView> {
   const state = await settings.read();
   if (state.status !== "ready") throw new Error("aw:settings_invalid|");
   const values = state.values;
@@ -88,15 +113,37 @@ export async function readBackground(settings: Settings): Promise<BackgroundView
     rightShade: values.rightShade,
     bottomShade: values.bottomShade,
     panelShade: values.panelShade,
+    focus: values.focus,
+    glass: values.glass,
+    portrait: false,
+    motion: values.motion,
+    brightness: values.brightness,
+    saturation: values.saturation,
+    imageBlur: values.imageBlur,
+    focal: values.focal,
+    galleryIndex: null as number | null,
+    nextChangeAt: null as number | null,
   };
-  const path = resolveImage(values.imagePath);
-  if (!path) return { ...base, dataUrl: null, imageKey: "", error: "aw:plugin_dir_missing|" };
+  const portrait = wantPortrait && values.portraitImagePath.trim() !== "";
+  base.portrait = portrait;
+  let chosen = portrait ? values.portraitImagePath : values.imagePath;
+  // Rotation : même image au même moment sur tous les appareils (calculée à partir de l'heure).
+  if (!portrait && values.rotation !== "off" && values.gallery.length > 0) {
+    const period = Number(values.rotation) * 60_000;
+    const slot = Math.floor(Date.now() / period);
+    const index = (slot + values.rotationOffset) % values.gallery.length;
+    chosen = values.gallery[index];
+    base.galleryIndex = index;
+    base.nextChangeAt = (slot + 1) * period;
+  }
+  const path = resolveImage(chosen);
+  if (!path) return { ...base, media: null, error: "aw:plugin_dir_missing|" };
   try {
-    const image = await loadImage(path);
-    return { ...base, dataUrl: image.dataUrl, imageKey: image.key, error: null };
+    const media = await describeMedia(path);
+    return { ...base, media, error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[app-wallpaper] image unreadable", message);
-    return { ...base, dataUrl: null, imageKey: "", error: message };
+    return { ...base, media: null, error: message };
   }
 }

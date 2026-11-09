@@ -4,18 +4,20 @@ App Wallpaper met une image en fond de toute l'application Paseo et ajoute par-d
 
 Les dégradés suivent la vraie mise en page. Le plugin mesure la barre latérale, le panneau de droite et la zone d'écriture, et ajuste les dégradés quand vous les redimensionnez. Les conversations restent dégagées pour laisser voir l'image ; les cartes de messages, la zone d'écriture, les fenêtres et les menus gardent leur propre fond. Les grands panneaux qui ne sont pas une conversation reçoivent le voile des panneaux annexes.
 
+Une bande de verre dépoli peut se placer derrière chaque colonne de messages. Sur les écrans sans conversation, comme les réglages ou les pages de plugins, un mode concentration floute ou assombrit le fond. Une image pour écran vertical, facultative, est utilisée quand la fenêtre est plus haute que large. L'image peut bouger très lentement, être retouchée (luminosité, saturation, flou, point de cadrage) et défiler depuis une galerie à l'intervalle choisi.
+
 Trois modes de cadrage sont proposés : remplir la fenêtre (rogne un peu), image entière avec bords flous, ou image entière avec bandes noires. Un indicateur de netteté compare la taille de l'image à celle de la fenêtre et prévient quand l'image est agrandie.
 
 ## Mise en place
 
-Nécessite Paseo 0.15.2 ou plus récent. Ouvrez App Wallpaper depuis la barre latérale ou depuis les réglages du plugin, puis cliquez sur **Parcourir…** pour choisir une image sur votre appareil, ou indiquez le chemin d'une image sur la machine où tourne le daemon Paseo (par exemple `~/Pictures/fond.jpg`). Les formats JPG, PNG, WebP et GIF animé sont acceptés, jusqu'à 20 Mo. Sans chemin, une image fournie en 5120 × 1440 est utilisée. Pour un rendu net, choisissez une image au moins aussi grande que votre fenêtre, en paysage.
+Nécessite Paseo 0.15.2 ou plus récent. Ouvrez App Wallpaper depuis la barre latérale ou depuis les réglages du plugin, puis cliquez sur **Parcourir…** pour choisir une image sur votre appareil, ou indiquez le chemin d'une image sur la machine où tourne le daemon Paseo (par exemple `~/Pictures/fond.jpg`). Les formats JPG, PNG, WebP, GIF animé et les vidéos MP4 ou WebM sont acceptés, jusqu'à 200 Mo. Les vidéos tournent en boucle, sans le son, et se mettent en pause quand la fenêtre est cachée. Sans chemin, une image carrée fournie en 3840 × 3840 est utilisée : elle s'adapte à toutes les formes d'écran. Pour un rendu net, choisissez une image au moins aussi grande que votre fenêtre, en paysage.
 
 Le fond s'affiche dans l'application de bureau (testée sur macOS et Windows ; Linux utilise la même application mais n'a pas été testé) et dans l'application web. Les applications iOS et Android sont natives et n'ont pas de page à modifier : le plugin n'y a aucun effet. L'écran de réglages est disponible en français et en anglais.
 
 ## Données et autorisations
 
-- Une image choisie avec **Parcourir…** est envoyée au daemon et enregistrée dans `$PASEO_HOME/plugin-data/app-wallpaper/wallpaper-<heure>.<ext>` ; seule la dernière est conservée.
-- Le daemon lit le fichier image au chemin indiqué, seulement s'il a une extension d'image et pèse 20 Mo au plus, puis l'envoie aux applications Paseo connectées à ce daemon. L'image n'est envoyée nulle part ailleurs.
+- Une image choisie avec **Parcourir…** est envoyée au daemon et enregistrée dans `$PASEO_HOME/plugin-data/app-wallpaper/wallpaper-<heure>.<ext>` ; seule la dernière est conservée, sauf les images de la galerie, gardées jusqu'à ce que vous les retiriez.
+- Le daemon lit le fichier image au chemin indiqué, seulement s'il a une extension d'image ou de vidéo et pèse 200 Mo au plus, puis l'envoie par morceaux aux applications Paseo connectées à ce daemon. L'image n'est envoyée nulle part ailleurs.
 - Le plugin lit le fichier de configuration de Paseo (`$PASEO_HOME/config.json`) pour trouver son dossier d'installation et l'image fournie.
 - Les réglages sont enregistrés par Paseo sur la machine du daemon et partagés par toutes les applications qui y sont connectées.
 - Le plugin ne fait aucune requête réseau, ne collecte aucune donnée et n'envoie rien aux fournisseurs d'agents.

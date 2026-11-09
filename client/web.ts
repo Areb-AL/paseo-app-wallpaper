@@ -23,6 +23,7 @@ interface El {
   querySelector(selector: string): El | null;
   getBoundingClientRect(): Rect;
   appendChild(el: El): void;
+  readonly childElementCount: number;
   remove(): void;
   style: { setProperty(name: string, value: string): void; removeProperty(name: string): void };
 }
@@ -31,8 +32,12 @@ declare const document: {
   head: El;
   body: El;
   getElementById(id: string): El | null;
-  createElement(tag: "style"): El;
+  createElement(tag: "style" | "div"): El;
   createElement(tag: "input"): FileInput;
+  createElement(tag: "video"): VideoEl;
+  readonly visibilityState: string;
+  addEventListener(type: "visibilitychange", listener: () => void): void;
+  removeEventListener(type: "visibilitychange", listener: () => void): void;
   querySelector(selector: string): El | null;
   querySelectorAll(selector: string): ArrayLike<El>;
   elementsFromPoint(x: number, y: number): El[];
@@ -45,7 +50,8 @@ declare const window: {
   addEventListener(type: "resize", listener: () => void): void;
   removeEventListener(type: "resize", listener: () => void): void;
 };
-interface FileLike { name: string; size: number; arrayBuffer(): Promise<ArrayBuffer> }
+interface BlobLike { arrayBuffer(): Promise<ArrayBuffer> }
+interface FileLike extends BlobLike { name: string; size: number; slice(start: number, end: number): BlobLike }
 interface FileInput {
   type: string;
   accept: string;
@@ -58,6 +64,21 @@ declare function atob(data: string): string;
 declare function btoa(data: string): string;
 declare class Blob {
   constructor(parts: Uint8Array[], options: { type: string });
+}
+interface VideoEl extends El {
+  readyState: number;
+  load(): void;
+  src: string;
+  muted: boolean;
+  loop: boolean;
+  autoplay: boolean;
+  playsInline: boolean;
+  videoWidth: number;
+  videoHeight: number;
+  paused: boolean;
+  play(): Promise<void>;
+  pause(): void;
+  addEventListener(type: "loadedmetadata", listener: () => void): void;
 }
 declare const URL: { createObjectURL(blob: Blob): string; revokeObjectURL(url: string): void };
 declare class Image {
@@ -77,6 +98,9 @@ declare const MutationObserver: new (cb: () => void) => {
 };
 
 const STYLE_ID = "app-wallpaper-style";
+const GLASS_ID = "app-wallpaper-glass";
+const VIDEO_ID = "app-wallpaper-video";
+const FOCUS = "data-aw-focus";
 const CLEAR = "data-aw-clear";
 const SHADE = "data-aw-shade";
 const CHAT = '[data-testid="agent-chat-scroll"]';
@@ -125,87 +149,207 @@ export function toBase64(bytes: Uint8Array): string {
 }
 
 /** Ouvre le sélecteur de fichiers de l'appareil et renvoie l'image choisie (null si annulé). */
-export function pickImageFile(): Promise<{ name: string; size: number; bytes: Uint8Array } | null> {
+export function pickImageFile(): Promise<{ name: string; size: number; read(start: number, end: number): Promise<Uint8Array> } | null> {
   if (!isWeb()) return Promise.resolve(null);
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "image/jpeg,image/png,image/gif,image/webp";
+    input.accept = "image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,.m4v";
     input.addEventListener("cancel", () => resolve(null));
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return resolve(null);
-      file
-        .arrayBuffer()
-        .then((buffer) => resolve({ name: file.name, size: file.size, bytes: new Uint8Array(buffer) }))
-        .catch(() => resolve(null));
+      // Lecture par morceaux à la demande : une vidéo de 200 Mo n'est jamais chargée d'un coup.
+      resolve({
+        name: file.name,
+        size: file.size,
+        read: (start, end) => file.slice(start, end).arrayBuffer().then((buffer) => new Uint8Array(buffer)),
+      });
     };
     input.click();
   });
 }
 
-export const isWeb = () => Platform.OS === "web" && typeof document !== "undefined";
+/** Vrai quand la fenêtre est plus haute que large. */
+export const isPortraitWindow = () => isWeb() && window.innerHeight > window.innerWidth;
 
-/**
- * Chrome refuse les URL de plus de 2 Mo : une grande image en data URL serait ignorée (fond noir).
- * On la transforme en Blob local, désigné par une URL courte.
- */
-function toObjectUrl(dataUrl: string): string {
-  const comma = dataUrl.indexOf(",");
-  const mime = dataUrl.slice(5, comma).split(";")[0] || "image/jpeg";
-  const binary = atob(dataUrl.slice(comma + 1));
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return URL.createObjectURL(new Blob([bytes], { type: mime }));
+/** Prévient quand la fenêtre passe de paysage à portrait ou l'inverse. Renvoie le nettoyage. */
+export function watchOrientation(onChange: (portrait: boolean) => void): () => void {
+  if (!isWeb()) return () => {};
+  let current = isPortraitWindow();
+  const listener = () => {
+    const next = isPortraitWindow();
+    if (next !== current) {
+      current = next;
+      onChange(next);
+    }
+  };
+  window.addEventListener("resize", listener);
+  return () => window.removeEventListener("resize", listener);
 }
 
-function css(view: BackgroundView, imageUrl: string): string {
+export const isWeb = () => Platform.OS === "web" && typeof document !== "undefined";
+
+/** Assemble des morceaux base64 en une URL locale (blob:) ; sans data URL, donc sans limite de 2 Mo. */
+export function chunksToObjectUrl(chunks: string[], mime: string): string {
+  const parts: Uint8Array[] = chunks.map((data) => {
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  });
+  return URL.createObjectURL(new Blob(parts, { type: mime }));
+}
+
+export const revokeObjectUrl = (url: string) => URL.revokeObjectURL(url);
+
+/** Position de l'image selon le point de cadrage choisi. */
+const FOCAL: Record<string, string> = {
+  center: "center",
+  top: "center top",
+  bottom: "center bottom",
+  left: "left center",
+  right: "right center",
+};
+
+/**
+ * Calques, du fond vers le contenu (tous fixes, sous l'interface de Paseo) :
+ *   html::before  (z -4) fond flouté du mode « bords flous » ;
+ *   html::after   (z -3) l'image, avec ses retouches et son mouvement ;
+ *   body::after   (z -2) les dégradés et le voile ;
+ *   body::before  (z -1) le mode concentration ;
+ *   vitres        (z -1) dans un conteneur à part, seulement quand une conversation est affichée.
+ * L'image a son propre calque : elle peut bouger (transform, accéléré par la carte graphique)
+ * sans redessiner les dégradés.
+ */
+function css(view: BackgroundView, imageUrl: string, isVideo: boolean): string {
   const shades = `
     linear-gradient(to right, rgb(0 0 0 / var(--aw-left)) 0px, rgb(0 0 0 / calc(var(--aw-left) * 0.78)) calc(var(--aw-side) * 0.6), rgb(0 0 0 / calc(var(--aw-left) * 0.6)) var(--aw-side), rgb(0 0 0 / calc(var(--aw-left) * 0.25)) calc(var(--aw-side) + 140px), rgb(0 0 0 / 0) calc(var(--aw-side) + 320px)),
     linear-gradient(to left, rgb(0 0 0 / var(--aw-right, 0)) 0px, rgb(0 0 0 / calc(var(--aw-right, 0) * 0.78)) calc(var(--aw-rside, 0px) * 0.6), rgb(0 0 0 / calc(var(--aw-right, 0) * 0.6)) var(--aw-rside, 0px), rgb(0 0 0 / calc(var(--aw-right, 0) * 0.25)) calc(var(--aw-rside, 0px) + 140px), rgb(0 0 0 / 0) calc(var(--aw-rside, 0px) + 320px)),
     linear-gradient(to top, rgb(0 0 0 / var(--aw-bottom)) 0px, rgb(0 0 0 / calc(var(--aw-bottom) * 0.8)) var(--aw-composer), rgb(0 0 0 / 0) calc(var(--aw-composer) + 220px)),
-    linear-gradient(rgb(0 0 0 / var(--aw-dim)), rgb(0 0 0 / var(--aw-dim))),
-    url("${imageUrl}")`;
-  const common = `
-body, #root { background: transparent !important; }
-[${CLEAR}] { background-color: transparent !important; }
-[${SHADE}] { background-color: rgb(0 0 0 / var(--aw-panel)) !important; }
-`;
-  if (view.fit === "blur") {
-    // Image entière au centre ; les bandes vides sont remplies par la même image, agrandie et floutée.
-    // Deux calques fixes sous le contenu : ::before (flou) puis ::after (image nette + dégradés).
-    return `
+    linear-gradient(rgb(0 0 0 / var(--aw-dim)), rgb(0 0 0 / var(--aw-dim)))`;
+  const blurEdges = view.fit === "blur";
+  const size = view.fit === "cover" ? "cover" : "contain";
+  const position = FOCAL[view.focal] ?? "center";
+  // Pas de filtre quand les retouches sont neutres : un filtre oblige à redessiner l'image à chaque image.
+  const filters = [
+    view.brightness !== 1 ? `brightness(${view.brightness})` : "",
+    view.saturation !== 1 ? `saturate(${view.saturation})` : "",
+    view.imageBlur > 0 ? `blur(${view.imageBlur}px)` : "",
+  ].filter(Boolean);
+  const filter = filters.length > 0 ? filters.join(" ") : "none";
+  // Mouvement lent : zoom et glissement doux, en aller-retour. Durée selon la vitesse choisie.
+  const duration = view.motion === "medium" ? 40 : 90;
+  const motion = view.motion === "off"
+    ? ""
+    : `animation: aw-drift ${duration}s ease-in-out infinite alternate; will-change: transform; backface-visibility: hidden; transform: translate3d(0, 0, 0);`;
+  // Marge pour que les bords ne se voient jamais pendant le mouvement ou avec le flou.
+  const bleed = view.motion !== "off" || view.imageBlur > 0 ? "-4%" : "0";
+  return `
 html { background: #000 !important; }
-html::before, html::after { content: ""; position: fixed; pointer-events: none; }
+body, #root { background: transparent !important; }
+html::before, html::after, body::after {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+}
 html::before {
   inset: -60px;
-  z-index: -2;
-  background: url("${imageUrl}") center / cover no-repeat;
-  filter: blur(40px) brightness(0.55) saturate(1.1);
+  z-index: -4;
+  ${blurEdges && !isVideo ? `background: url("${imageUrl}") center / cover no-repeat; filter: blur(40px) brightness(0.55) saturate(1.1);` : "display: none;"}
 }
-html::after {
+${isVideo ? `html::after { display: none; }
+#${VIDEO_ID} {
+  position: fixed;
+  top: ${bleed};
+  left: ${bleed};
+  width: ${bleed === "0" ? "100%" : "108%"};
+  height: ${bleed === "0" ? "100%" : "108%"};
+  z-index: -3;
+  pointer-events: none;
+  object-fit: ${size};
+  object-position: ${position};
+  filter: ${filter};
+  ${motion}
+}` : `html::after {
+  inset: ${bleed};
+  z-index: -3;
+  background: url("${imageUrl}") ${position} / ${size} no-repeat;
+  filter: ${filter};
+  ${motion}
+}`}
+body::after {
+  inset: 0;
+  z-index: -2;
+  background-image: ${shades};
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+/* translate3d/scale3d : calculé par la carte graphique, au sous-pixel près (pas de saccades). */
+@keyframes aw-drift {
+  0% { transform: translate3d(0, 0, 0) scale3d(1, 1, 1); }
+  50% { transform: translate3d(-1.2%, 0.8%, 0) scale3d(1.05, 1.05, 1); }
+  100% { transform: translate3d(1.2%, -0.8%, 0) scale3d(1.08, 1.08, 1); }
+}
+[${CLEAR}] { background-color: transparent !important; }
+[${SHADE}] { background-color: rgb(0 0 0 / var(--aw-panel)) !important; }
+/* Mode concentration : écrans sans conversation. */
+body::before {
+  content: "";
+  position: fixed;
   inset: 0;
   z-index: -1;
-  background-image: ${shades} !important;
-  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, contain !important;
-  background-position: 0 0, 0 0, 0 0, 0 0, center !important;
-  background-repeat: no-repeat !important;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease-out;
 }
-${common}`;
-  }
-  const fit = view.fit === "contain" ? "contain" : "cover";
-  return `
-html {
-  background-color: #000 !important;
-  background-image: ${shades} !important;
-  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, ${fit} !important;
-  background-position: 0 0, 0 0, 0 0, 0 0, center !important;
-  background-repeat: no-repeat !important;
-  background-attachment: fixed !important;
+html[${FOCUS}="blur"] body::before {
+  opacity: 1;
+  background: rgb(0 0 0 / 0.35);
+  backdrop-filter: blur(24px) saturate(0.9);
+  -webkit-backdrop-filter: blur(24px) saturate(0.9);
 }
-${common}`;
+html[${FOCUS}="dim"] body::before { opacity: 1; background: rgb(0 0 0 / 0.55); }
+/* Vitre dépolie derrière chaque colonne de messages. */
+#${GLASS_ID} > div {
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
 }
-
+/*
+ * Flou progressif : trois couches empilées, chacune masquée par un dégradé (bords → centre).
+ * Une couche de flou léger et large, une de flou fort et resserrée, puis le voile sombre.
+ * Le passage du net au flou se fait donc en douceur, sur les côtés et en haut.
+ */
+#${GLASS_ID} > div > div {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+#${GLASS_ID} > div > div:nth-child(1) {
+  backdrop-filter: blur(5px) saturate(0.95);
+  -webkit-backdrop-filter: blur(5px) saturate(0.95);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent), linear-gradient(to bottom, transparent, #000 140px);
+  mask-image: linear-gradient(to right, transparent, #000 18%, #000 82%, transparent), linear-gradient(to bottom, transparent, #000 140px);
+}
+#${GLASS_ID} > div > div:nth-child(2) {
+  backdrop-filter: blur(22px) saturate(0.9);
+  -webkit-backdrop-filter: blur(22px) saturate(0.9);
+  -webkit-mask-image: linear-gradient(to right, transparent 6%, #000 32%, #000 68%, transparent 94%), linear-gradient(to bottom, transparent 60px, #000 260px);
+  mask-image: linear-gradient(to right, transparent 6%, #000 32%, #000 68%, transparent 94%), linear-gradient(to bottom, transparent 60px, #000 260px);
+}
+#${GLASS_ID} > div > div:nth-child(3) {
+  background: rgb(0 0 0 / var(--aw-glass, 0));
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 22%, #000 78%, transparent), linear-gradient(to bottom, transparent, #000 180px);
+  mask-image: linear-gradient(to right, transparent, #000 22%, #000 78%, transparent), linear-gradient(to bottom, transparent, #000 180px);
+}
+@media (prefers-reduced-motion: reduce) {
+  html::after, #${VIDEO_ID} { animation: none !important; }
+  body::before { transition: none; }
+}
+`;
+}
 
 function opaque(color: string): boolean {
   if (!color || color === "transparent") return false;
@@ -221,7 +365,7 @@ function opaque(color: string): boolean {
  * - un grand panneau vertical qui ne contient pas de conversation (terminal, fichiers…) et n'est pas
  *   la barre latérale reçoit un voile sombre, une seule fois (pas sur ses enfants).
  */
-function clearLayout(root: El, side: number, shadePanels: boolean, report?: string[]): number {
+function clearLayout(root: El, side: number, shadePanels: boolean, report?: string[]): { rightSide: number; chats: Rect[] } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const shaded = new Set<El>();
@@ -258,6 +402,9 @@ function clearLayout(root: El, side: number, shadePanels: boolean, report?: stri
         r.left >= side - 4 &&
         // Un panneau annexe, pas toute la zone de contenu.
         r.width < (vw - side) * 0.7 &&
+        // Panneau annexe seulement à côté d'une conversation, ou collé au bord droit (fichiers).
+        // Sans conversation à l'écran (paramètres, pages de plugins), pas de rectangle voilé.
+        (chats.length > 0 || r.right >= vw - 4) &&
         !overlapsChat(r) &&
         !child.matches(SETTINGS) &&
         !child.closest(SETTINGS) &&
@@ -283,7 +430,35 @@ function clearLayout(root: El, side: number, shadePanels: boolean, report?: stri
   // Un panneau qui contient désormais une conversation (ou a disparu) perd son voile.
   const marked = document.querySelectorAll(`[${SHADE}]`);
   for (let i = 0; i < marked.length; i++) if (!shaded.has(marked[i])) marked[i].removeAttribute(SHADE);
-  return rightSide;
+  return { rightSide, chats };
+}
+
+/** Rectangles visibles d'un sélecteur. */
+function visibleAll(selector: string): Rect[] {
+  const out: Rect[] = [];
+  const all = document.querySelectorAll(selector);
+  for (let i = 0; i < all.length; i++) {
+    const r = all[i].getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) out.push(r);
+  }
+  return out;
+}
+
+/**
+ * Colonnes des messages : pour chaque conversation visible, la largeur de sa zone d'écriture
+ * (qui est celle des messages), de son haut jusqu'au bas de la zone d'écriture.
+ */
+function messageColumns(chats: Rect[]): Rect[] {
+  const composers = visibleAll(COMPOSER);
+  return chats.map((c) => {
+    const composer = composers.find((k) => k.left + k.width / 2 > c.left && k.left + k.width / 2 < c.right);
+    const width = composer ? composer.width + 112 : Math.min(c.width, 940);
+    const center = composer ? composer.left + composer.width / 2 : c.left + c.width / 2;
+    const left = Math.max(c.left, center - width / 2);
+    const right = Math.min(c.right, center + width / 2);
+    const bottom = composer ? composer.bottom : c.bottom;
+    return { left, right, top: c.top, bottom, width: right - left, height: bottom - c.top };
+  });
 }
 
 /** Premier élément visible : Paseo garde les écrans des autres onglets montés mais cachés. */
@@ -309,7 +484,8 @@ function measure(): number {
 }
 
 export interface BackgroundController {
-  apply(view: BackgroundView): void;
+  /** Pose le fond ; url est l'URL locale (blob:) du fichier décrit par view.media. */
+  apply(view: BackgroundView, url: string): void;
   /** Renvoie la structure des grands blocs (mise au point). */
   probe(): string;
   stop(): void;
@@ -317,10 +493,30 @@ export interface BackgroundController {
 
 export function createBackground(): BackgroundController {
   if (!isWeb()) return { apply: () => {}, probe: () => "pas de page web (mobile)", stop: () => {} };
+  let video: VideoEl | undefined;
+  // Vider vraiment le lecteur : sans src ni load(), il garde ses images décodées en mémoire un moment.
+  const removeMedia = () => {
+    if (!video) return;
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    video.remove();
+    video = undefined;
+  };
+  // Vidéo en pause quand la fenêtre est cachée ou réduite, pour économiser la batterie.
+  const onVisibility = () => {
+    if (!video) return;
+    if (document.visibilityState === "hidden") video.pause();
+    else video.play().catch(() => {});
+  };
   let style: El | undefined;
   let imageKey = "";
+  let styleKey = "";
   let objectUrl = "";
   let shadePanels = true;
+  let focusMode: "blur" | "dim" | "off" = "blur";
+  let glass = 0;
+  let glassBox: El | undefined;
   let frame = 0;
   let timer = 0;
   let lastPass = 0;
@@ -333,9 +529,37 @@ export function createBackground(): BackgroundController {
     if (!style) return;
     const side = measure();
     const root = document.getElementById("root") ?? document.body;
-    const rightSide = clearLayout(root, side, shadePanels);
-    document.documentElement.style.setProperty("--aw-rside", rightSide + "px");
+    const { rightSide, chats } = clearLayout(root, side, shadePanels);
+    const html = document.documentElement;
+    html.style.setProperty("--aw-rside", rightSide + "px");
+    // Mode concentration : aucune conversation à l'écran.
+    if (focusMode !== "off" && chats.length === 0) html.setAttribute(FOCUS, focusMode);
+    else html.removeAttribute(FOCUS);
+    placeGlass(glass > 0 ? messageColumns(chats) : []);
   };
+  // Vitres : un bloc fixe par colonne de messages, dans un conteneur hors de <body> (non observé).
+  const placeGlass = (columns: Rect[]) => {
+    if (!glassBox) {
+      if (columns.length === 0) return;
+      glassBox = document.createElement("div");
+      glassBox.setAttribute("id", GLASS_ID);
+      document.documentElement.appendChild(glassBox);
+    }
+    while (glassBox.childElementCount < columns.length) {
+      const pane = document.createElement("div");
+      for (let layer = 0; layer < 3; layer++) pane.appendChild(document.createElement("div"));
+      glassBox.appendChild(pane);
+    }
+    while (glassBox.childElementCount > columns.length) glassBox.children[glassBox.childElementCount - 1].remove();
+    columns.forEach((col, i) => {
+      const pane = glassBox!.children[i];
+      pane.style.setProperty("left", col.left + "px");
+      pane.style.setProperty("top", col.top + "px");
+      pane.style.setProperty("width", Math.max(0, col.width) + "px");
+      pane.style.setProperty("height", Math.max(0, col.height) + "px");
+    });
+  };
+
   // Pendant qu'un agent écrit, la page change sans arrêt : une analyse toutes les 200 ms suffit.
   const schedule = () => {
     if (frame || timer) return;
@@ -357,21 +581,27 @@ export function createBackground(): BackgroundController {
     timer = 0;
     style?.remove();
     style = undefined;
+    glassBox?.remove();
+    glassBox = undefined;
+    removeMedia();
+    document.removeEventListener("visibilitychange", onVisibility);
+    document.documentElement.removeAttribute(FOCUS);
     imageKey = "";
+    styleKey = "";
     imageSize = undefined;
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = "";
     for (const attr of [CLEAR, SHADE]) {
       const marked = document.querySelectorAll(`[${attr}]`);
       for (let i = 0; i < marked.length; i++) marked[i].removeAttribute(attr);
     }
     const html = document.documentElement;
-    for (const name of ["--aw-side", "--aw-composer", "--aw-left", "--aw-right", "--aw-rside", "--aw-bottom", "--aw-dim", "--aw-panel"]) html.style.removeProperty(name);
+    for (const name of ["--aw-side", "--aw-composer", "--aw-left", "--aw-right", "--aw-rside", "--aw-bottom", "--aw-dim", "--aw-panel", "--aw-glass"]) html.style.removeProperty(name);
   };
 
   return {
-    apply(view) {
-      if (!view.enabled || !view.dataUrl) return teardown();
+    apply(view, url) {
+      if (!view.enabled || !view.media || !url) return teardown();
+      const isVideo = view.media.kind === "video";
       const html = document.documentElement;
       html.style.setProperty("--aw-left", String(view.leftShade));
       html.style.setProperty("--aw-bottom", String(view.bottomShade));
@@ -379,7 +609,12 @@ export function createBackground(): BackgroundController {
       html.style.setProperty("--aw-dim", String(view.dim));
       html.style.setProperty("--aw-panel", String(view.panelShade));
       shadePanels = view.panelShade > 0;
-      const key = view.imageKey + ":" + view.fit;
+      focusMode = view.focus;
+      glass = view.glass;
+      html.style.setProperty("--aw-glass", String(view.glass));
+      // Deux clés : le fichier lui-même et l'apparence (style à reconstruire).
+      const fileKey = view.media.key + ":" + (view.portrait ? "p" : "l");
+      const lookKey = [fileKey, view.fit, view.motion, view.focal, view.brightness, view.saturation, view.imageBlur].join(":");
       if (!style) {
         style = document.createElement("style");
         style.setAttribute("id", STYLE_ID);
@@ -388,26 +623,51 @@ export function createBackground(): BackgroundController {
         mo.observe(document.body, { childList: true, subtree: true });
         observer = mo;
         window.addEventListener("resize", schedule);
+        document.addEventListener("visibilitychange", onVisibility);
       }
-      if (key !== imageKey) {
-        const previous = objectUrl;
-        objectUrl = toObjectUrl(view.dataUrl);
-        style.textContent = css(view, objectUrl);
-        const probe = new Image();
-        const fit = view.fit;
-        probe.onload = () => {
-          imageSize = { width: probe.naturalWidth, height: probe.naturalHeight, fit };
-        };
-        probe.src = objectUrl;
-        if (previous) URL.revokeObjectURL(previous);
-        imageKey = key;
+      if (fileKey !== imageKey) {
+        // Les URL appartiennent au téléchargeur (index.client.tsx), qui les libère.
+        objectUrl = url;
+        if (isVideo) {
+          removeMedia();
+          const source = document.createElement("video");
+          source.setAttribute("id", VIDEO_ID);
+          source.muted = true;
+          source.loop = true;
+          source.autoplay = true;
+          source.playsInline = true;
+          source.addEventListener("loadedmetadata", () => {
+            imageSize = { width: source.videoWidth, height: source.videoHeight, fit: view.fit };
+          });
+          video = source;
+          document.documentElement.appendChild(source);
+          source.src = url;
+          if (document.visibilityState !== "hidden") source.play().catch(() => {});
+        } else {
+          removeMedia();
+          const probe = new Image();
+          probe.onload = () => {
+            imageSize = { width: probe.naturalWidth, height: probe.naturalHeight, fit: view.fit };
+            probe.onload = null;
+            probe.src = "";
+          };
+          probe.src = url;
+        }
+        imageKey = fileKey;
+      }
+      if (imageSize) imageSize = { ...imageSize, fit: view.fit };
+      if (lookKey !== styleKey) {
+        style.textContent = css(view, objectUrl, isVideo);
+        styleKey = lookKey;
       }
       schedule();
     },
     probe() {
       const report: string[] = [`viewport ${window.innerWidth}x${window.innerHeight} dpr=${window.devicePixelRatio} screen=${window.screen.width}x${window.screen.height}`];
       const root = document.getElementById("root") ?? document.body;
-      clearLayout(root, measure(), shadePanels, report);
+      const layout = clearLayout(root, measure(), shadePanels, report);
+      report.push(`loaded ${JSON.stringify(sharpness() ?? null)} video=${!!video}`);
+      report.push(`chats ${layout.chats.length} focus=${document.documentElement.getAttribute(FOCUS)} glass=${JSON.stringify(messageColumns(layout.chats))}`);
       const handle = visible(SIDEBAR_HANDLE);
       const composer = visible(COMPOSER);
       const vw = window.innerWidth;

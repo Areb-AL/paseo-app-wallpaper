@@ -11,7 +11,7 @@ import {
 } from "@getpaseo/plugin/client/ui";
 import { useEffect, useRef, useState } from "react";
 import { Text } from "react-native";
-import { backgroundSettings, LEVELS, MAX_IMAGE_BYTES, UPLOAD_CHUNK_BYTES, uploadChunk, uploadFinish, uploadStart } from "../shared/background";
+import { backgroundSettings, galleryRemove, LEVELS, MAX_IMAGE_BYTES, UPLOAD_CHUNK_BYTES, uploadChunk, uploadFinish, uploadStart } from "../shared/background";
 import { resolveLang, TEXTS, translateError, type LanguageSetting } from "./i18n";
 import { getAppLocale, getLastError, refreshBackground } from "./state";
 import { isWeb, pickImageFile, sharpness, toBase64, type Sharpness } from "./web";
@@ -20,6 +20,17 @@ type Values = {
   enabled: boolean;
   language: LanguageSetting;
   imagePath: string;
+  portraitImagePath: string;
+  focus: "blur" | "dim" | "off";
+  glass: number;
+  motion: "off" | "slow" | "medium";
+  brightness: number;
+  saturation: number;
+  imageBlur: number;
+  focal: "center" | "top" | "bottom" | "left" | "right";
+  gallery: string[];
+  rotation: "off" | "5" | "15" | "60" | "1440";
+  rotationOffset: number;
   fit: "cover" | "contain" | "blur";
   dim: number;
   leftShade: number;
@@ -31,9 +42,11 @@ type Values = {
 export function BackgroundSettings({ theme }: PluginSurfaceProps) {
   const settings = useSettings(backgroundSettings);
   const pathInput = useRef<{ getText(): string; replaceText(text: string): void } | null>(null);
+  const portraitInput = useRef<{ getText(): string; replaceText(text: string): void } | null>(null);
   const start = useRpc(uploadStart);
   const sendChunk = useRpc(uploadChunk);
   const finish = useRpc(uploadFinish);
+  const removeFile = useRpc(galleryRemove);
   const [upload, setUpload] = useState<{ text: string; error?: string } | null>(null);
   const [info, setInfo] = useState<Sharpness | undefined>(() => sharpness());
   const [imageError, setImageError] = useState<string | null>(() => getLastError());
@@ -65,6 +78,39 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
     { label: t.fitBlur, value: "blur" },
     { label: t.fitContain, value: "contain" },
   ];
+  const focusOptions = [
+    { label: t.focusBlur, value: "blur" },
+    { label: t.focusDim, value: "dim" },
+    { label: t.focusOff, value: "off" },
+  ];
+  const pick = <T extends string>(entries: Array<[T, string]>) => entries.map(([value, label]) => ({ value, label }));
+  const focalOptions = pick([["center", t.focalCenter], ["top", t.focalTop], ["bottom", t.focalBottom], ["left", t.focalLeft], ["right", t.focalRight]]);
+  const motionOptions = pick([["off", t.motionOff], ["slow", t.motionSlow], ["medium", t.motionMedium]]);
+  const rotationOptions = pick([["off", t.rotationOff], ["5", t.rotation5], ["15", t.rotation15], ["60", t.rotation60], ["1440", t.rotation1440]]);
+  const percent = (values: number[]) => values.map((v) => ({ value: String(v), label: Math.round(v * 100) + " %" }));
+  const brightnessOptions = percent([0.5, 0.7, 0.85, 1, 1.15, 1.3]);
+  const saturationOptions = percent([0, 0.5, 0.8, 1, 1.2, 1.5]);
+  const blurOptions = [0, 2, 4, 8, 16].map((v) => ({ value: String(v), label: v === 0 ? t.none : v + " px" }));
+  const gallery = values.gallery ?? [];
+  const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
+  // Retirer l'image principale ou verticale : chemin vidé, fichier envoyé supprimé (s'il n'est pas dans la galerie).
+  const removeImage = async (slot: "landscape" | "portrait") => {
+    const path = slot === "portrait" ? values.portraitImagePath : values.imagePath;
+    if (slot === "portrait") {
+      portraitInput.current?.replaceText("");
+      await save({ portraitImagePath: "" });
+    } else {
+      pathInput.current?.replaceText("");
+      await save({ imagePath: "" });
+    }
+    if (path && !gallery.includes(path)) removeFile({ path }).catch(() => {});
+    setUpload({ text: t.removed });
+  };
+  const removeFromGallery = async (path: string) => {
+    await save({ gallery: gallery.filter((p) => p !== path) });
+    removeFile({ path }).catch(() => {});
+  };
+
   const languageOptions = [
     { label: t.auto, value: "auto" },
     { label: "Français", value: "fr" },
@@ -81,21 +127,28 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
   const sharp = sharpnessText();
 
   // Choisir une image sur l'appareil : elle est envoyée au daemon par morceaux, puis utilisée.
-  const chooseImage = async () => {
+  const chooseImage = async (slot: "landscape" | "portrait" | "gallery") => {
     const file = await pickImageFile();
     if (!file) return;
     if (file.size > MAX_IMAGE_BYTES) return setUpload({ text: file.name, error: t.errors.too_large });
     try {
       setUpload({ text: t.uploading(file.name, 0) });
-      await start({ name: file.name, size: file.size });
+      await start({ name: file.name, size: file.size, slot });
       for (let offset = 0; offset < file.size; offset += UPLOAD_CHUNK_BYTES) {
-        await sendChunk({ data: toBase64(file.bytes.subarray(offset, offset + UPLOAD_CHUNK_BYTES)) });
+        await sendChunk({ data: toBase64(await file.read(offset, Math.min(file.size, offset + UPLOAD_CHUNK_BYTES))) });
         const done = Math.min(100, Math.round(((offset + UPLOAD_CHUNK_BYTES) / file.size) * 100));
         setUpload({ text: t.uploading(file.name, done) });
       }
       const { path } = await finish({});
-      pathInput.current?.replaceText(path);
-      await save({ imagePath: path });
+      if (slot === "gallery") {
+        await save({ gallery: [...(values.gallery ?? []), path] });
+      } else if (slot === "portrait") {
+        portraitInput.current?.replaceText(path);
+        await save({ portraitImagePath: path });
+      } else {
+        pathInput.current?.replaceText(path);
+        await save({ imagePath: path });
+      }
       setUpload({ text: t.uploaded(file.name) });
     } catch (error) {
       setUpload({ text: file.name, error: translateError(error instanceof Error ? error.message : String(error), lang) });
@@ -118,7 +171,7 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
       <SettingsSection title={t.sectionWallpaper}>
         <SettingsCard>
           <SettingsSwitch label={t.show} hint={t.showHint} value={values.enabled} onValueChange={(enabled) => save({ enabled })} />
-          {isWeb() ? <SettingsAction label={t.choose} hint={t.chooseHint} actionLabel={t.browse} onPress={chooseImage} /> : null}
+          {isWeb() ? <SettingsAction label={t.choose} hint={t.chooseHint} actionLabel={t.browse} onPress={() => chooseImage("landscape")} /> : null}
           {upload ? <SettingsRow label={t.upload} hint={upload.text} error={upload.error} /> : null}
           <SettingsInput
             ref={pathInput as never}
@@ -128,10 +181,55 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
             initialValue={values.imagePath}
             onChangeText={() => {}}
           />
+          {values.imagePath ? (
+            <SettingsAction label={t.removeImage} hint={t.removeImageHint} actionLabel={t.removeAction} onPress={() => removeImage("landscape")} />
+          ) : null}
           {imageError ? <SettingsRow label={t.imageError} error={translateError(imageError, lang)} /> : null}
           <SettingsAction label={t.change} actionLabel={t.apply} onPress={() => save({ imagePath: pathInput.current?.getText().trim() ?? "" })} />
           <SettingsSelect label={t.fit} hint={t.fitHint} value={values.fit} options={fitOptions} onValueChange={(fit) => save({ fit: fit as Values["fit"] })} />
           <SettingsRow label={t.sharpness} hint={sharp.text} error={sharp.error} />
+        </SettingsCard>
+      </SettingsSection>
+      <SettingsSection title={t.sectionLook}>
+        <SettingsCard>
+          <SettingsSelect label={t.motion} hint={t.motionHint} value={values.motion ?? "off"} options={motionOptions} onValueChange={(v) => save({ motion: v as Values["motion"] })} />
+          <SettingsSelect label={t.focal} hint={t.focalHint} value={values.focal ?? "center"} options={focalOptions} onValueChange={(v) => save({ focal: v as Values["focal"] })} />
+          <SettingsSelect label={t.brightness} value={String(values.brightness ?? 1)} options={brightnessOptions} onValueChange={(v) => save({ brightness: Number(v) })} />
+          <SettingsSelect label={t.saturation} value={String(values.saturation ?? 1)} options={saturationOptions} onValueChange={(v) => save({ saturation: Number(v) })} />
+          <SettingsSelect label={t.imageBlur} hint={t.imageBlurHint} value={String(values.imageBlur ?? 0)} options={blurOptions} onValueChange={(v) => save({ imageBlur: Number(v) })} />
+        </SettingsCard>
+      </SettingsSection>
+      <SettingsSection title={t.sectionGallery}>
+        <SettingsCard>
+          <SettingsSelect label={t.rotation} hint={t.rotationHint} value={values.rotation ?? "off"} options={rotationOptions} onValueChange={(v) => save({ rotation: v as Values["rotation"] })} />
+          {isWeb() ? <SettingsAction label={t.galleryAdd} hint={t.chooseHint} actionLabel={t.browse} onPress={() => chooseImage("gallery")} /> : null}
+          {values.imagePath && !gallery.includes(values.imagePath) ? (
+            <SettingsAction label={t.galleryAddCurrent} hint={t.galleryAddCurrentHint} actionLabel={t.add} onPress={() => save({ gallery: [...gallery, values.imagePath] })} />
+          ) : null}
+          {gallery.length > 1 ? (
+            <SettingsAction label={t.next} actionLabel={t.nextAction} onPress={() => save({ rotationOffset: (values.rotationOffset ?? 0) + 1 })} />
+          ) : null}
+          {gallery.length === 0 ? <SettingsRow label={t.galleryEmpty} /> : null}
+          {gallery.map((path, i) => (
+            <SettingsAction key={path} label={`${i + 1}. ${fileName(path)}`} hint={path} actionLabel={t.remove} onPress={() => removeFromGallery(path)} />
+          ))}
+        </SettingsCard>
+      </SettingsSection>
+      <SettingsSection title={t.sectionPortrait}>
+        <SettingsCard>
+          {isWeb() ? <SettingsAction label={t.portraitImage} hint={t.chooseHint} actionLabel={t.browse} onPress={() => chooseImage("portrait")} /> : null}
+          <SettingsInput
+            ref={portraitInput as never}
+            label={t.image}
+            hint={t.portraitHint}
+            placeholder="~/Pictures/wallpaper-portrait.jpg"
+            initialValue={values.portraitImagePath}
+            onChangeText={() => {}}
+          />
+          <SettingsAction label={t.change} actionLabel={t.apply} onPress={() => save({ portraitImagePath: portraitInput.current?.getText().trim() ?? "" })} />
+          {values.portraitImagePath ? (
+            <SettingsAction label={t.removeImage} hint={t.removeImageHint} actionLabel={t.removeAction} onPress={() => removeImage("portrait")} />
+          ) : null}
         </SettingsCard>
       </SettingsSection>
       <SettingsSection title={t.sectionReadability}>
@@ -140,6 +238,8 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
           <SettingsSelect label={t.right} hint={t.rightHint} value={String(values.rightShade)} options={levelOptions} onValueChange={(v) => save({ rightShade: Number(v) })} />
           <SettingsSelect label={t.bottom} hint={t.bottomHint} value={String(values.bottomShade)} options={levelOptions} onValueChange={(v) => save({ bottomShade: Number(v) })} />
           <SettingsSelect label={t.panels} hint={t.panelsHint} value={String(values.panelShade)} options={levelOptions} onValueChange={(v) => save({ panelShade: Number(v) })} />
+          <SettingsSelect label={t.glass} hint={t.glassHint} value={String(values.glass)} options={levelOptions} onValueChange={(v) => save({ glass: Number(v) })} />
+          <SettingsSelect label={t.focus} hint={t.focusHint} value={values.focus} options={focusOptions} onValueChange={(v) => save({ focus: v as Values["focus"] })} />
           <SettingsSelect label={t.dim} hint={t.dimHint} value={String(values.dim)} options={levelOptions} onValueChange={(v) => save({ dim: Number(v) })} />
           {settings.saveError ? <SettingsRow label={t.error} error={String(settings.saveError)} /> : null}
         </SettingsCard>

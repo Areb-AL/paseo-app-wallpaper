@@ -19,3 +19,4 @@ export const setAppLocale = (locale: string) => {
   appLocale = locale || "en";
 };
 export const getAppLocale = () => appLocale;
+

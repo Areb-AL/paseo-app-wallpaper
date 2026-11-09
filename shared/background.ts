@@ -27,6 +27,25 @@ export const backgroundSettings = defineSettings({
     rightShade: level.default(0.85),
     /** Dégradé noir en bas, derrière la zone d'écriture. */
     bottomShade: level.default(0.85),
+    /** Mouvement lent de l'image (zoom et glissement doux). */
+    motion: z.enum(["off", "slow", "medium"]).default("off"),
+    /** Retouches appliquées à l'affichage (le fichier n'est pas modifié). */
+    brightness: z.number().min(0.3).max(1.6).default(1),
+    saturation: z.number().min(0).max(2).default(1),
+    imageBlur: z.number().min(0).max(30).default(0),
+    /** Point de cadrage : quelle partie de l'image garder quand elle est rognée. */
+    focal: z.enum(["center", "top", "bottom", "left", "right"]).default("center"),
+    /** Galerie d'images et changement automatique (minutes ; "off" : image fixe). */
+    gallery: z.array(z.string()).max(50).default([]),
+    rotation: z.enum(["off", "5", "15", "60", "1440"]).default("off"),
+    /** Décalage ajouté par le bouton « Image suivante ». */
+    rotationOffset: z.number().int().min(0).default(0),
+    /** Image utilisée quand la fenêtre est plus haute que large (téléphone en version web, écran tourné). Vide : la même. */
+    portraitImagePath: z.string().default(""),
+    /** Écrans sans conversation (réglages, pages de plugins) : fond flouté, assombri, ou inchangé. */
+    focus: z.enum(["blur", "dim", "off"]).default("blur"),
+    /** Vitre dépolie derrière la colonne des messages : intensité du voile (0 = pas de vitre). */
+    glass: level.default(0.45),
     /** Voile noir sur les panneaux qui ne sont pas une conversation : terminal, fichiers… */
     panelShade: level.default(0.85),
   }),
@@ -34,10 +53,19 @@ export const backgroundSettings = defineSettings({
 
 export const backgroundView = z.object({
   enabled: z.boolean(),
-  /** Image encodée en data URL ; null si elle n'a pas pu être lue. */
-  dataUrl: z.string().nullable(),
-  /** Identifie l'image (chemin + date de modification) pour éviter de la reposer pour rien. */
-  imageKey: z.string(),
+  /**
+   * Le fichier à afficher (image ou vidéo), téléchargé ensuite par morceaux avec mediaChunk ;
+   * null s'il n'a pas pu être lu. key identifie le fichier (chemin, date, taille).
+   */
+  media: z
+    .object({
+      key: z.string(),
+      mime: z.string(),
+      size: z.number(),
+      kind: z.enum(["image", "video"]),
+      chunks: z.number(),
+    })
+    .nullable(),
   error: z.string().nullable(),
   fit,
   dim: level,
@@ -45,12 +73,24 @@ export const backgroundView = z.object({
   rightShade: level,
   bottomShade: level,
   panelShade: level,
+  focus: z.enum(["blur", "dim", "off"]),
+  glass: level,
+  /** Vrai si l'image envoyée est celle pour écran vertical. */
+  portrait: z.boolean(),
+  motion: z.enum(["off", "slow", "medium"]),
+  brightness: z.number(),
+  saturation: z.number(),
+  imageBlur: z.number(),
+  focal: z.enum(["center", "top", "bottom", "left", "right"]),
+  /** Rotation : position dans la galerie et moment du prochain changement (ms, null si fixe). */
+  galleryIndex: z.number().nullable(),
+  nextChangeAt: z.number().nullable(),
 });
 export type BackgroundView = z.infer<typeof backgroundView>;
 
 export const getBackground = defineRpc({
   name: "background.get",
-  input: z.object({}),
+  input: z.object({ portrait: z.boolean().default(false) }),
   output: backgroundView,
 });
 
@@ -61,8 +101,8 @@ export const probeLayout = defineRpc({
   output: z.object({ ok: z.boolean() }),
 });
 
-/** Taille maximale d'une image, partagée par la lecture et l'envoi. */
-export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+/** Taille maximale d'une image ou d'une vidéo, partagée par la lecture et l'envoi. */
+export const MAX_IMAGE_BYTES = 200 * 1024 * 1024;
 /**
  * Taille d'un morceau envoyé (avant base64, soit environ 4 Mo une fois encodé) : bien sous la limite
  * d'Android (16 Mo par envoi). Les morceaux voyagent en base64 dans du JSON, car l'envoi binaire
@@ -73,7 +113,12 @@ export const UPLOAD_CHUNK_BYTES = 3 * 1024 * 1024;
 /** Envoi d'une image choisie dans l'appli : début (nom et taille), morceaux binaires, fin. */
 export const uploadStart = defineRpc({
   name: "upload.start",
-  input: z.object({ name: z.string().min(1).max(255), size: z.number().int().positive().max(MAX_IMAGE_BYTES) }),
+  input: z.object({
+    name: z.string().min(1).max(255),
+    size: z.number().int().positive().max(MAX_IMAGE_BYTES),
+    /** Image principale ou image pour écran vertical. */
+    slot: z.enum(["landscape", "portrait", "gallery"]).default("landscape"),
+  }),
   output: z.object({ ok: z.boolean() }),
 });
 
@@ -87,4 +132,18 @@ export const uploadFinish = defineRpc({
   name: "upload.finish",
   input: z.object({}),
   output: z.object({ path: z.string() }),
+});
+
+/** Retire une image (principale, verticale ou de galerie) : supprime le fichier s'il a été envoyé avec Parcourir… */
+export const galleryRemove = defineRpc({
+  name: "gallery.remove",
+  input: z.object({ path: z.string() }),
+  output: z.object({ deleted: z.boolean() }),
+});
+
+/** Un morceau du fichier à afficher, en base64 (l'envoi binaire demande un Paseo plus récent que 0.15.2). */
+export const mediaChunk = defineRpc({
+  name: "media.chunk",
+  input: z.object({ key: z.string(), index: z.number().int().min(0) }),
+  output: z.object({ data: z.string() }),
 });

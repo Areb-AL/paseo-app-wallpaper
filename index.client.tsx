@@ -2,8 +2,8 @@ import type { PluginClientContext, PluginSidebarItemProps } from "@getpaseo/plug
 import { SidebarRow } from "@getpaseo/plugin/client/ui";
 import { BackgroundSettings } from "./client/settings";
 import { setAppLocale, setLastError, setRefresher } from "./client/state";
-import { createBackground, isWeb } from "./client/web";
-import { getBackground, probeLayout } from "./shared/background";
+import { chunksToObjectUrl, createBackground, isPortraitWindow, isWeb, revokeObjectUrl, watchOrientation } from "./client/web";
+import { getBackground, mediaChunk, probeLayout, type BackgroundView } from "./shared/background";
 
 // Mise au point : envoie la structure de l'écran dans les logs du plugin (paseo plugin logs app-wallpaper).
 const PROBE = false;
@@ -16,15 +16,61 @@ export default function contribute(client: PluginClientContext) {
     setAppLocale("en");
   }
   let alive = true;
+  // Fichier affiché, gardé en mémoire pour ne rien retélécharger quand un réglage change. Un seul à la fois.
+  const downloaded = new Map<string, string>();
+  let loading: Promise<string> | undefined;
+  let loadingKey = "";
+
+  const download = async (media: NonNullable<BackgroundView["media"]>) => {
+    const hit = downloaded.get(media.key);
+    if (hit) return hit;
+    if (loading && loadingKey === media.key) return loading;
+    loadingKey = media.key;
+    loading = (async () => {
+      const chunks: string[] = [];
+      for (let index = 0; index < media.chunks; index++) {
+        const { data } = await client.rpc(mediaChunk, { key: media.key, index });
+        chunks.push(data);
+      }
+      const url = chunksToObjectUrl(chunks, media.mime);
+      downloaded.set(media.key, url);
+      while (downloaded.size > 1) {
+        const [oldKey, oldUrl] = downloaded.entries().next().value as [string, string];
+        downloaded.delete(oldKey);
+        revokeObjectUrl(oldUrl);
+      }
+      return url;
+    })();
+    try {
+      return await loading;
+    } finally {
+      loading = undefined;
+      loadingKey = "";
+    }
+  };
+  let rotationTimer: ReturnType<typeof setTimeout> | undefined;
 
   const refresh = () => {
     client
-      .rpc(getBackground, {})
+      .rpc(getBackground, { portrait: isPortraitWindow() })
       .then((view) => {
         if (!alive) return;
         setLastError(view.error);
+        // Rotation : on redemande l'image au moment du prochain changement.
+        if (rotationTimer) clearTimeout(rotationTimer);
+        rotationTimer = undefined;
+        if (view.nextChangeAt) rotationTimer = setTimeout(refresh, Math.max(1000, view.nextChangeAt - Date.now() + 500));
         if (view.error) console.warn("[app-wallpaper]", view.error);
-        background.apply(view);
+        if (!view.enabled || !view.media) {
+          // Rien à afficher : on libère aussi le fichier gardé en mémoire.
+          background.apply(view, "");
+          for (const url of downloaded.values()) revokeObjectUrl(url);
+          downloaded.clear();
+          return;
+        }
+        return download(view.media).then((url) => {
+          if (alive) background.apply(view, url);
+        });
       })
       .catch((error: unknown) => {
         setLastError(error instanceof Error ? error.message : String(error));
@@ -33,6 +79,8 @@ export default function contribute(client: PluginClientContext) {
   };
   setRefresher(refresh);
   if (isWeb()) refresh();
+  // Paysage ↔ portrait : on redemande l'image (celle pour écran vertical si elle est réglée).
+  const stopOrientation = watchOrientation(() => refresh());
 
   let probeTimer: ReturnType<typeof setTimeout> | undefined;
   if (PROBE && isWeb()) {
@@ -48,10 +96,14 @@ export default function contribute(client: PluginClientContext) {
 
   return () => {
     alive = false;
+    stopOrientation();
+    if (rotationTimer) clearTimeout(rotationTimer);
     if (probeTimer) clearTimeout(probeTimer);
     setRefresher(() => {});
     removeSettings();
     removeSidebar();
     background.stop();
+    for (const url of downloaded.values()) revokeObjectUrl(url);
+    downloaded.clear();
   };
 }

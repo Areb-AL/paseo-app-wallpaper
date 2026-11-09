@@ -20,11 +20,21 @@ for long chats. Swap the image whenever you like; the readability stays.
 
 ## ✨ Features
 
-- **Any image, untouched** — JPG, PNG, WebP or animated GIF, up to 20 MB. The file is never edited.
+- **Any image, untouched** — JPG, PNG, WebP, animated GIF, MP4 or WebM video, up to 200 MB. The file is never edited.
 - **Layout-aware gradients** — left, right and bottom gradients sized to the *actual* sidebar,
   right panel and composer, and they follow you when you resize them.
 - **Readable everywhere** — a global veil for chat text, and a separate veil for side panels
   (terminal, files, Kanban…). Chats stay clear so the image shows through.
+- **Glass behind the chat** — a blurred, darkened band with soft edges sits behind each message
+  column, so long answers stay easy to read while the wallpaper shows on both sides.
+- **Focus mode** — on screens without a chat (settings, plugin pages), the wallpaper fades to a blur
+  or a darker tone, and comes back sharp when you return to a chat.
+- **Portrait image** — an optional second image used when the window is taller than wide
+  (the web app on a phone, a rotated monitor).
+- **Gentle motion** — an optional, very slow zoom and drift; off when the system asks for less motion.
+- **Gallery and rotation** — keep several images and switch every 5 min, 15 min, hour or day,
+  the same image on every device at the same time; a *Next image* button skips ahead.
+- **Adjustments** — brightness, saturation, blur and focal point, applied on display only.
 - **Three fit modes** — *Fill window*, *Whole image with blurred edges* (no black bars, ever),
   or *Whole image with black bars*.
 - **Sharpness check** — tells you live whether your image is downscaled (sharp) or stretched (blurry),
@@ -80,11 +90,17 @@ Open **App Wallpaper** in the sidebar (or *Settings → Plugins → App Wallpape
 | --- | --- |
 | **Show wallpaper** | Turns the plugin on or off. |
 | **Choose an image** | **Parcourir…** opens your device's file picker; the image is copied to the daemon host (`$PASEO_HOME/plugin-data/app-wallpaper/`). |
-| **Image** | Or a path to an image on the daemon host, e.g. `~/Pictures/wallpaper.jpg`, then **Apply**. Leave empty for the bundled `assets/default-5120x1440.jpg` (procedural violet halftone clouds). |
+| **Image** | Or a path to an image on the daemon host, e.g. `~/Pictures/wallpaper.jpg`, then **Apply**. Leave empty for the bundled `assets/default-3840x3840.jpg`, a square image that fits any screen shape. |
 | **Fit** | *Fill window* (crops a little), *Whole image, blurred edges*, or *Whole image, black bars*. |
 | **Sharpness** | Image size vs. window size, with a warning when the image is stretched. |
 | **Left / Right / Bottom gradient** | Strength of each gradient, from none to 100 %. |
-| **Side panels** | Veil on non-chat panels (terminal, files…). |
+| **Side panels** | Veil on panels next to a chat (terminal, files…). |
+| **Glass behind the chat** | Strength of the blurred band behind each message column, from none to 100 %. |
+| **Outside chats** | Focus mode on screens without a chat: *Blur*, *Dark* or *Unchanged*. |
+| **Motion** | *None*, *Slow* or *Medium* zoom and drift. |
+| **Focal point / Brightness / Saturation / Image blur** | Adjust how the image is shown; the file is never modified. |
+| **Gallery** | Add images (**Browse…** or the main image), choose how often they change, skip with *Next image*. |
+| **Portrait image** | Optional image for windows taller than wide, with its own **Browse…** button. |
 | **Image veil** | Darkens the whole image so chat text stays legible. |
 
 ### Pick an image that stays sharp
@@ -116,7 +132,7 @@ is an independent project, not affiliated with Chat Polish.
 
 - `server/background.ts` reads the settings, loads the image from disk and sends it to the app.
 - `client/web.ts` adds a `<style>` tag: the image and the gradients become the page background.
-  Images are passed as a Blob URL, because Chromium rejects data URLs over 2 MB.
+  The file is sent in 3 MB chunks and rebuilt as a Blob URL (Chromium rejects data URLs over 2 MB); videos play in a muted, looping `<video>` element.
 - A `MutationObserver` finds large layout blocks with an opaque background and makes them transparent.
   Large panels that are not a chat get the side-panel veil. Dialogs, menus, message cards and the
   composer keep their own background.
@@ -152,13 +168,15 @@ paseo plugin reload app-wallpaper
 paseo plugin logs app-wallpaper
 ```
 
+Work happens on the `dev` branch; `main` only moves at releases, so installs from GitHub
+(`paseo plugin update`) always get a finished version.
+
 Plugin docs: <https://paseo.sh/docs/plugins>
 
 ## 🗺️ Roadmap
 
-- Focus mode: blur the wallpaper on screens without a chat (settings, plugin pages).
-- Gentle animated wallpapers.
-- Frosted glass behind the chat column.
+- Per-workspace wallpapers.
+- A theme generated from the wallpaper colors.
 
 ## 🤝 Contributing
 
