@@ -93,6 +93,19 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
   const blurOptions = [0, 2, 4, 8, 16].map((v) => ({ value: String(v), label: v === 0 ? t.none : v + " px" }));
   const gallery = values.gallery ?? [];
   const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
+  // Retirer l'image principale ou verticale : chemin vidé, fichier envoyé supprimé (s'il n'est pas dans la galerie).
+  const removeImage = async (slot: "landscape" | "portrait") => {
+    const path = slot === "portrait" ? values.portraitImagePath : values.imagePath;
+    if (slot === "portrait") {
+      portraitInput.current?.replaceText("");
+      await save({ portraitImagePath: "" });
+    } else {
+      pathInput.current?.replaceText("");
+      await save({ imagePath: "" });
+    }
+    if (path && !gallery.includes(path)) removeFile({ path }).catch(() => {});
+    setUpload({ text: t.removed });
+  };
   const removeFromGallery = async (path: string) => {
     await save({ gallery: gallery.filter((p) => p !== path) });
     removeFile({ path }).catch(() => {});
@@ -168,6 +181,9 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
             initialValue={values.imagePath}
             onChangeText={() => {}}
           />
+          {values.imagePath ? (
+            <SettingsAction label={t.removeImage} hint={t.removeImageHint} actionLabel={t.removeAction} onPress={() => removeImage("landscape")} />
+          ) : null}
           {imageError ? <SettingsRow label={t.imageError} error={translateError(imageError, lang)} /> : null}
           <SettingsAction label={t.change} actionLabel={t.apply} onPress={() => save({ imagePath: pathInput.current?.getText().trim() ?? "" })} />
           <SettingsSelect label={t.fit} hint={t.fitHint} value={values.fit} options={fitOptions} onValueChange={(fit) => save({ fit: fit as Values["fit"] })} />
@@ -211,6 +227,9 @@ export function BackgroundSettings({ theme }: PluginSurfaceProps) {
             onChangeText={() => {}}
           />
           <SettingsAction label={t.change} actionLabel={t.apply} onPress={() => save({ portraitImagePath: portraitInput.current?.getText().trim() ?? "" })} />
+          {values.portraitImagePath ? (
+            <SettingsAction label={t.removeImage} hint={t.removeImageHint} actionLabel={t.removeAction} onPress={() => removeImage("portrait")} />
+          ) : null}
         </SettingsCard>
       </SettingsSection>
       <SettingsSection title={t.sectionReadability}>

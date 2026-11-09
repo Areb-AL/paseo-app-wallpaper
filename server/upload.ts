@@ -65,11 +65,14 @@ export async function finishUpload() {
   return { path };
 }
 
-/** Supprime un fichier de la galerie, seulement s'il est dans notre dossier et a été envoyé par nous. */
+/**
+ * Supprime un fichier envoyé avec Parcourir… (image principale, verticale ou de galerie), seulement s'il est
+ * dans notre dossier de données. Un fichier choisi par un chemin ailleurs sur le disque n'est jamais touché.
+ */
 export async function removeGalleryFile({ path }: { path: string }) {
   const dir = dataDir();
   const name = basename(path);
-  if (dirname(path) !== dir || !name.startsWith("gallery-")) return { deleted: false };
+  if (dirname(path) !== dir || !/^(wallpaper|portrait|gallery)-/.test(name)) return { deleted: false };
   await rm(path, { force: true });
   return { deleted: true };
 }

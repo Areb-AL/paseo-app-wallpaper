@@ -134,7 +134,7 @@ export const uploadFinish = defineRpc({
   output: z.object({ path: z.string() }),
 });
 
-/** Retire une image de la galerie : supprime le fichier s'il a été envoyé avec Parcourir… */
+/** Retire une image (principale, verticale ou de galerie) : supprime le fichier s'il a été envoyé avec Parcourir… */
 export const galleryRemove = defineRpc({
   name: "gallery.remove",
   input: z.object({ path: z.string() }),

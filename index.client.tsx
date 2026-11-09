@@ -61,7 +61,13 @@ export default function contribute(client: PluginClientContext) {
         rotationTimer = undefined;
         if (view.nextChangeAt) rotationTimer = setTimeout(refresh, Math.max(1000, view.nextChangeAt - Date.now() + 500));
         if (view.error) console.warn("[app-wallpaper]", view.error);
-        if (!view.enabled || !view.media) return background.apply(view, "");
+        if (!view.enabled || !view.media) {
+          // Rien à afficher : on libère aussi le fichier gardé en mémoire.
+          background.apply(view, "");
+          for (const url of downloaded.values()) revokeObjectUrl(url);
+          downloaded.clear();
+          return;
+        }
         return download(view.media).then((url) => {
           if (alive) background.apply(view, url);
         });
