@@ -90,7 +90,7 @@ Open **App Wallpaper** in the sidebar (or *Settings → Plugins → App Wallpape
 | --- | --- |
 | **Show wallpaper** | Turns the plugin on or off. |
 | **Choose an image** | **Parcourir…** opens your device's file picker; the image is copied to the daemon host (`$PASEO_HOME/plugin-data/app-wallpaper/`). |
-| **Image** | Or a path to an image on the daemon host, e.g. `~/Pictures/wallpaper.jpg`, then **Apply**. Leave empty for the bundled `assets/default-5120x1440.jpg` (procedural violet halftone clouds). |
+| **Image** | Or a path to an image on the daemon host, e.g. `~/Pictures/wallpaper.jpg`, then **Apply**. Leave empty for the bundled `assets/default-3840x3840.jpg`, a square image that fits any screen shape. |
 | **Fit** | *Fill window* (crops a little), *Whole image, blurred edges*, or *Whole image, black bars*. |
 | **Sharpness** | Image size vs. window size, with a warning when the image is stretched. |
 | **Left / Right / Bottom gradient** | Strength of each gradient, from none to 100 %. |

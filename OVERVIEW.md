@@ -10,7 +10,7 @@ Three fit modes are available: fill the window (crops a little), show the whole 
 
 ## Setup
 
-Requires Paseo 0.15.2 or later. Open App Wallpaper from the sidebar, or from the plugin's settings, then click **Parcourir…** to pick an image on your device, or enter the path of an image on the machine running the Paseo daemon (for example `~/Pictures/wallpaper.jpg`). JPG, PNG, WebP, animated GIF and MP4 or WebM videos are supported, up to 200 MB. Videos loop without sound and pause when the window is hidden. With no path, a bundled 5120 × 1440 image is used. For a sharp result, use an image at least as large as your window, in landscape.
+Requires Paseo 0.15.2 or later. Open App Wallpaper from the sidebar, or from the plugin's settings, then click **Parcourir…** to pick an image on your device, or enter the path of an image on the machine running the Paseo daemon (for example `~/Pictures/wallpaper.jpg`). JPG, PNG, WebP, animated GIF and MP4 or WebM videos are supported, up to 200 MB. Videos loop without sound and pause when the window is hidden. With no path, a bundled 3840 × 3840 square image is used, which fits any screen shape. For a sharp result, use an image at least as large as your window, in landscape.
 
 The wallpaper appears in the desktop app (tested on macOS and Windows; Linux uses the same app but is untested) and in the web app. The iOS and Android apps are native and have no page to restyle, so the plugin has no effect there. The settings screen is available in French and English.
 

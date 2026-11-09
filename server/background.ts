@@ -8,7 +8,7 @@ import { MAX_IMAGE_BYTES, UPLOAD_CHUNK_BYTES, type BackgroundView, type backgrou
 type Settings = PluginSettings<(typeof backgroundSettings)["schema"]>;
 
 export const PLUGIN_ID = "app-wallpaper";
-const DEFAULT_IMAGE = "assets/default-5120x1440.jpg";
+const DEFAULT_IMAGE = "assets/default-3840x3840.jpg";
 const MAX_BYTES = MAX_IMAGE_BYTES;
 export const MIME: Record<string, string> = {
   ".jpg": "image/jpeg",
